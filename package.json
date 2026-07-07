@@ -1,0 +1,21 @@
+{
+  "name": "sfcc-coveo-commerce",
+  "version": "1.0.0",
+  "description": "SFCC cartridge for Coveo Commerce API integration",
+  "private": true,
+  "scripts": {
+    "lint": "npm run lint:js",
+    "lint:js": "sgmf-scripts --lint js",
+    "upload": "sgmf-scripts --upload -- ",
+    "uploadCartridge": "sgmf-scripts --uploadCartridge int_coveo_commerce"
+  },
+  "devDependencies": {
+    "babel-eslint": "^7.2.3",
+    "eslint": "^3.2.2",
+    "eslint-config-airbnb-base": "^5.0.1",
+    "eslint-plugin-import": "^1.12.0",
+    "eslint-plugin-sitegenesis": "~1.0.0",
+    "sgmf-scripts": "^2.1.1"
+  },
+  "packageName": "int_coveo_commerce"
+}

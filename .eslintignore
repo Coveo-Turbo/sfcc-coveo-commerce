@@ -1,0 +1,7 @@
+node_modules/
+**/static/**
+**/bin/**
+**/coverage/**
+**/doc/**
+lib/**
+webpack.config.js

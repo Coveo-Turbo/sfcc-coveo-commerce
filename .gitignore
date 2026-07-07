@@ -1,0 +1,5 @@
+node_modules/
+dw.json
+dw.*.json
+!dw.example.json
+npm-debug.log*

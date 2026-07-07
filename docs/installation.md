@@ -10,6 +10,12 @@
 
 Add this repository to your SFCC project and ensure the cartridge is available under the `int_coveo_commerce` folder name.
 
+The cartridge source lives in:
+
+```text
+cartridges/int_coveo_commerce
+```
+
 Typical cartridge path:
 
 ```text
@@ -21,6 +27,16 @@ If your storefront overrides the sample controllers or mappers from this cartrid
 ## Deploy
 
 Deploy the cartridge and import or configure the required site preferences described in the configuration guide.
+
+For the npm-based upload workflow used in this repository:
+
+```text
+npm install
+cp dw.example.json dw.json
+npm run uploadCartridge
+```
+
+Keep `dw.json` local and out of source control.
 
 ## Next Steps
 

@@ -24,37 +24,38 @@ SFCC + Coveo
 ## Cartridge Structure
 
 ```text
-int_coveo_commerce/
-  cartridge/
-    controllers/
-      Search.js
-      Category.js
-    models/
-      SearchResult.js
-      ListingResult.js
-      RecommendationResult.js
-    scripts/
-      config/
-        Config.js
-      helpers/
-        GtmHelper.js
-        Logger.js
-        QueryBuilder.js
-        UrlHelper.js
-      mappers/
-        FacetMapper.js
-        ListingResultMapper.js
-        PaginationMapper.js
-        ProductMapper.js
-        RecommendationMapper.js
-        SearchResultMapper.js
-        SortMapper.js
-      services/
-        AnalyticsService.js
-        AuthenticationService.js
-        CommerceApiService.js
-        HttpClient.js
-        SearchTokenService.js
+cartridges/
+  int_coveo_commerce/
+    cartridge/
+      controllers/
+        Search.js
+        Category.js
+      models/
+        SearchResult.js
+        ListingResult.js
+        RecommendationResult.js
+      scripts/
+        config/
+          Config.js
+        helpers/
+          GtmHelper.js
+          Logger.js
+          QueryBuilder.js
+          UrlHelper.js
+        mappers/
+          FacetMapper.js
+          ListingResultMapper.js
+          PaginationMapper.js
+          ProductMapper.js
+          RecommendationMapper.js
+          SearchResultMapper.js
+          SortMapper.js
+        services/
+          AnalyticsService.js
+          AuthenticationService.js
+          CommerceApiService.js
+          HttpClient.js
+          SearchTokenService.js
 ```
 
 ## Responsibilities
@@ -83,6 +84,18 @@ int_coveo_commerce/
 - [Configuration Guide](docs/configuration.md)
 - [Integration Guide](docs/integration.md)
 - [Customization Guide](docs/customization.md)
+
+## Local Development
+
+This repository follows the same SFCC npm workflow as `sfcc-coveo-catalog-ingestion`.
+
+```text
+npm install
+cp dw.example.json dw.json
+npm run uploadCartridge
+```
+
+`dw.json` is intentionally ignored and should stay local to your machine.
 
 ## Cartridge Path
 
