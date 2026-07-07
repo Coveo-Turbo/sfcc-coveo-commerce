@@ -1,17 +1,15 @@
 'use strict';
 
 var Config = require('*/cartridge/scripts/config/Config');
+var SearchTokenService = require('*/cartridge/scripts/services/SearchTokenService');
 
-var AUTH_STRATEGIES = {
-    BEARER: 'bearer',
-    OAUTH: 'oauth'
-};
+var AUTH_MODES = Config.AUTH_MODES;
 
-function getAccessToken(settings) {
+function getAccessToken(settings, authContext) {
     var config = settings || Config.getSettings();
 
-    if (config.authStrategy === AUTH_STRATEGIES.OAUTH) {
-        throw new Error('OAuth authentication is not implemented for int_coveo_commerce.');
+    if (config.authMode === AUTH_MODES.SEARCH_TOKEN) {
+        return SearchTokenService.requestSearchToken(authContext || {}, config);
     }
 
     if (!config.apiToken) {
@@ -21,7 +19,7 @@ function getAccessToken(settings) {
     return config.apiToken;
 }
 
-function buildHeaders(baseHeaders, settings) {
+function buildHeaders(baseHeaders, settings, authContext) {
     var config = settings || Config.getSettings();
     var headers = {};
     var source = baseHeaders || {};
@@ -30,13 +28,13 @@ function buildHeaders(baseHeaders, settings) {
         headers[key] = source[key];
     });
 
-    headers.Authorization = 'Bearer ' + getAccessToken(config);
+    headers.Authorization = 'Bearer ' + getAccessToken(config, authContext);
 
     return headers;
 }
 
 module.exports = {
-    AUTH_STRATEGIES: AUTH_STRATEGIES,
+    AUTH_MODES: AUTH_MODES,
     getAccessToken: getAccessToken,
     buildHeaders: buildHeaders
 };

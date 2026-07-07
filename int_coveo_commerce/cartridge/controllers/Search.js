@@ -30,6 +30,7 @@ function buildParams(req) {
         params[key] = query[key];
     });
 
+    params.currentCustomer = req.currentCustomer;
     params.request = getHttpRequest();
     params.response = getHttpResponse();
 

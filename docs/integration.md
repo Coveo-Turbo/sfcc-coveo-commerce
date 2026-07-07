@@ -33,6 +33,16 @@ These controllers:
 
 They do not ship templates. The sample page routes render existing SFRA search templates to demonstrate the integration seam, while customers remain free to override the controllers or use the service layer directly.
 
+## Authentication Modes
+
+`int_coveo_commerce` supports two server-side authentication modes:
+
+- `apiKey`: uses a shared Commerce bearer token for each Commerce API request
+- `searchToken`: uses server-side code in SFCC to mint a per-user search token, then authenticates Commerce API requests with that token
+
+The search-token flow is useful when the storefront is authenticated and product visibility or pricing should vary by shopper identity or entitlements.
+In this cartridge, the minted search token is used by the server-side integration layer and is not exposed to the storefront browser by default.
+
 ## Expected Customer Work
 
 - Install the cartridge

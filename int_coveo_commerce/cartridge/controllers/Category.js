@@ -31,6 +31,7 @@ function buildParams(req) {
     });
 
     params.categoryId = params.categoryId || params.cgid || '';
+    params.currentCustomer = req.currentCustomer;
     params.request = getHttpRequest();
     params.response = getHttpResponse();
 

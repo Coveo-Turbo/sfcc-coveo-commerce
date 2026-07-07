@@ -98,7 +98,7 @@ function request(options) {
     var requestOptions = options || {};
     var method = (requestOptions.method || 'GET').toUpperCase();
     var operationName = requestOptions.name || requestOptions.url || 'request';
-    var headers = AuthenticationService.buildHeaders(requestOptions.headers || {}, settings);
+    var headers = AuthenticationService.buildHeaders(requestOptions.headers || {}, settings, requestOptions.authContext);
     var payload = requestOptions.body;
     var timeoutMillis = requestOptions.timeout || settings.timeoutMillis;
     var retryCount = typeof requestOptions.retryCount === 'number' ? requestOptions.retryCount : settings.retryCount;

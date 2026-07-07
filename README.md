@@ -54,12 +54,15 @@ int_coveo_commerce/
         AuthenticationService.js
         CommerceApiService.js
         HttpClient.js
+        SearchTokenService.js
 ```
 
 ## Responsibilities
 
 - Coveo Commerce API integration
-- Bearer-token authentication with a future OAuth seam
+- Dual authentication modes:
+  - direct API-key bearer authentication for public storefronts
+  - server-side search-token generation for authenticated storefronts
 - Search and category listing service wrappers
 - Query suggest and recommendations wrappers
 - Analytics context management, including `clientId`

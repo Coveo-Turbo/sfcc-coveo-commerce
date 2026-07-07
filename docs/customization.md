@@ -9,6 +9,7 @@ The cartridge is designed to be overridden from a custom storefront cartridge pl
 - `scripts/services/CommerceApiService.js`
 - `scripts/services/AuthenticationService.js`
 - `scripts/services/AnalyticsService.js`
+- `scripts/services/SearchTokenService.js`
 - `scripts/mappers/ProductMapper.js`
 - `scripts/mappers/RecommendationMapper.js`
 
@@ -17,7 +18,7 @@ The cartridge is designed to be overridden from a custom storefront cartridge pl
 - Add storefront-specific request parameters before calling `CommerceApiService`
 - Extend normalized product payloads with custom fields
 - Change how facets or sorting are presented in view data
-- Replace bearer-token authentication with a future OAuth strategy
+- Pass `searchTokenOptions` when you need to control user groups, filters, or allowed dictionary keys in search-token mode
 - Push GTM payloads through a custom client-side analytics integration
 
 ## GTM Integration

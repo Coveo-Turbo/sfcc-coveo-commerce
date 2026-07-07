@@ -63,7 +63,7 @@ function buildAnalyticsContext(params) {
     );
 }
 
-function execute(operationName, endpointPath, payload, settings) {
+function execute(operationName, endpointPath, payload, authContext, settings) {
     return HttpClient.request({
         name: operationName,
         method: 'POST',
@@ -72,6 +72,7 @@ function execute(operationName, endpointPath, payload, settings) {
             Accept: 'application/json',
             'Content-Type': 'application/json'
         },
+        authContext: authContext,
         body: payload,
         timeout: settings.timeoutMillis,
         retryCount: settings.retryCount,
@@ -117,7 +118,7 @@ function search(params) {
     validateConfiguration(settings);
     analyticsContext = buildAnalyticsContext(requestParams);
     payload = QueryBuilder.buildSearchPayload(requestParams, settings, analyticsContext);
-    response = execute('search', ENDPOINTS.SEARCH, payload, settings);
+    response = execute('search', ENDPOINTS.SEARCH, payload, requestParams, settings);
     mapped = SearchResultMapper.map(response.data, requestParams, analyticsContext);
 
     Logger.debug('Mapped Coveo search response.', {
@@ -139,7 +140,7 @@ function listing(params) {
     validateConfiguration(settings);
     analyticsContext = buildAnalyticsContext(requestParams);
     payload = QueryBuilder.buildListingPayload(requestParams, settings, analyticsContext);
-    response = execute('listing', ENDPOINTS.LISTING, payload, settings);
+    response = execute('listing', ENDPOINTS.LISTING, payload, requestParams, settings);
     mapped = ListingResultMapper.map(response.data, requestParams, analyticsContext);
 
     Logger.debug('Mapped Coveo listing response.', {
@@ -160,7 +161,7 @@ function querySuggest(params) {
     validateConfiguration(settings);
     analyticsContext = buildAnalyticsContext(requestParams);
     payload = QueryBuilder.buildQuerySuggestPayload(requestParams, settings, analyticsContext);
-    response = execute('querySuggest', ENDPOINTS.QUERY_SUGGEST, payload, settings);
+    response = execute('querySuggest', ENDPOINTS.QUERY_SUGGEST, payload, requestParams, settings);
 
     return normalizeSuggestions(response.data, analyticsContext);
 }
@@ -176,7 +177,7 @@ function recommendations(params) {
     validateConfiguration(settings);
     analyticsContext = buildAnalyticsContext(requestParams);
     payload = QueryBuilder.buildRecommendationsPayload(requestParams, settings, analyticsContext);
-    response = execute('recommendations', ENDPOINTS.RECOMMENDATIONS, payload, settings);
+    response = execute('recommendations', ENDPOINTS.RECOMMENDATIONS, payload, requestParams, settings);
     mapped = RecommendationMapper.map(response.data, requestParams, analyticsContext);
 
     return new RecommendationResult(mapped);
