@@ -51,6 +51,7 @@ cartridges/
           ListingResultMapper.js
           PaginationMapper.js
           ProductMapper.js
+          ProductSuggestionMapper.js
           RecommendationMapper.js
           SearchResultMapper.js
           SortMapper.js
@@ -70,12 +71,22 @@ cartridges/
     cartridge/
       controllers/
         Search.js
+        SearchBox.js
       scripts/
         helpers/
           coveoSearchHelpers.js
+          coveoSearchBoxHelpers.js
+      static/
+        default/
+          js/
+            coveoSearchBox.js
       templates/
         default/
+          components/
+            header/
+              search.isml
           search/
+            searchResultsNoDecorator.isml
             resultsCount.isml
             components/
               productTiles.isml
@@ -89,6 +100,7 @@ cartridges/
   - server-side search-token generation for authenticated storefronts
 - Search and category listing service wrappers
 - Query suggest and recommendations wrappers
+- Product suggest wrapper for search-box previews
 - Analytics context management, including `clientId`
 - Normalized result models for storefront integration
 - GTM helper payload generation
@@ -116,6 +128,7 @@ This repository follows the same SFCC npm workflow as `sfcc-coveo-catalog-ingest
 
 ```text
 npm install
+npm test
 cp dw.example.json dw.json
 npm run uploadCartridge
 npm run packageMetadata
@@ -162,6 +175,6 @@ Current Mondou starter scope:
 
 - query search pages only
 - sort and filter AJAX flows
+- header search box focus and typing states through `SearchBox-Bootstrap`, `SearchBox-Suggest`, and `SearchBox-Preview`
 - native category flows still handled by Mondou’s existing implementation
-- query suggest and category-page migration intentionally deferred to later phases
 - intended to be extracted into a separate Mondou delivery repo once the integration shape is validated

@@ -291,6 +291,20 @@ function buildQuerySuggestPayload(params, config, analyticsContext) {
     };
 }
 
+function buildProductSuggestPayload(params, config, analyticsContext) {
+    var commerceContext = buildCommerceContext(params, config);
+
+    return {
+        trackingId: params.trackingId || config.trackingId,
+        clientId: analyticsContext.clientId,
+        language: commerceContext.language,
+        country: commerceContext.country,
+        currency: commerceContext.currency,
+        query: params.q || params.query || '',
+        context: buildBaseContext(params)
+    };
+}
+
 function buildRecommendationsPayload(params, config, analyticsContext) {
     var commerceContext = buildCommerceContext(params, config);
     return {
@@ -309,5 +323,6 @@ module.exports = {
     buildSearchPayload: buildSearchPayload,
     buildListingPayload: buildListingPayload,
     buildQuerySuggestPayload: buildQuerySuggestPayload,
+    buildProductSuggestPayload: buildProductSuggestPayload,
     buildRecommendationsPayload: buildRecommendationsPayload
 };

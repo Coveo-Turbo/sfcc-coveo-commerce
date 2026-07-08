@@ -1,0 +1,46 @@
+<isset name="SearchBoxHelper" value="${require('*/cartridge/scripts/helpers/coveoSearchBoxHelpers')}" scope="page" />
+
+<div class="site-search">
+    <form role="search"
+        action="${URLUtils.url('Search-Show')}"
+        method="get"
+        name="simpleSearch">
+        <input class="form-control search-field"
+            type="text"
+            name="q"
+            value=""
+            placeholder="${Resource.msg('label.header.searchwatermark', 'common', null)}"
+            role="combobox"
+            aria-describedby="search-assistive-text"
+            aria-haspopup="listbox"
+            aria-owns="search-results"
+            aria-expanded="false"
+            aria-autocomplete="list"
+            aria-activedescendant=""
+            aria-controls="search-results"
+            aria-label="${Resource.msg('simplesearch.searchtext', 'common', null)}"
+            autocomplete="off" />
+        <button type="reset" name="reset-button" class="reset-button close d-none" aria-label="${Resource.msg('label.header.search.clear', 'common', null)}">
+            <span aria-hidden="true">×</span>
+        </button>
+        <button type="submit" name="search-button" class="icon-search" aria-label="${Resource.msg('label.header.search.go', 'common', null)}">
+            <isinlinesvg svgsrc="search" />
+        </button>
+        <div
+            class="suggestions-wrapper"
+            data-coveo-search-box="true"
+            data-url="${URLUtils.url('SearchBox-Suggest').toString()}?q="
+            data-bootstrap-url="${URLUtils.url('SearchBox-Bootstrap')}"
+            data-suggest-url="${URLUtils.url('SearchBox-Suggest')}"
+            data-preview-url="${URLUtils.url('SearchBox-Preview')}"
+            data-min-chars="${SearchBoxHelper.MIN_QUERY_LENGTH}"
+            data-label-recent="${Resource.msg('label.suggest.recent', 'search', null)}"
+            data-label-popular-searches="${Resource.msg('label.suggest.popular', 'search', null)}"
+            data-label-suggestions="${Resource.msg('label.coveo.searchbox.suggestions', 'search', null)}"
+            data-label-products="${Resource.msg('label.suggest.products', 'search', null)}"
+            data-label-popular-products="${Resource.msg('label.coveo.searchbox.popularProducts', 'search', null)}"
+            data-assistive-text="${Resource.msg('label.header.search.assistive_msg', 'common', null)}"
+            data-result-count-template="${Resource.msg('label.header.search.result.count.msg', 'common', null)}"></div>
+        <input type="hidden" value="${pdict.locale}" name="lang">
+    </form>
+</div>

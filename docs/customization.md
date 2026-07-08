@@ -18,6 +18,7 @@ The cartridge is designed to be overridden from a custom storefront cartridge pl
 - Add storefront-specific request parameters before calling `CommerceApiService`
 - Extend normalized product payloads with custom fields
 - Change how facets or sorting are presented in view data
+- Replace the sample `Search-ProductSuggestions` route or call `CommerceApiService.productSuggest()` directly from a storefront-specific search-box controller
 - Pass `searchTokenOptions` when you need to control user groups, filters, or allowed dictionary keys in search-token mode
 - Push GTM payloads through a custom client-side analytics integration
 

@@ -36,6 +36,7 @@ https://platform.cloud.coveo.com/rest/organizations/<ORG_ID>/commerce/v2
 | Preference ID | Purpose | Default |
 | --- | --- | --- |
 | `coveoCommerceApiToken` | Direct bearer token used when `coveoCommerceAuthMode=apiKey` | empty |
+| `coveoCommerceSearchBoxRecommendationSlotId` | Optional recommendation slot used by the temporary Mondou search-box overlay for focus-state popular products | empty |
 | `coveoCommerceAuthenticatedSearchApiKey` | Private API key used server-side to mint search tokens when `coveoCommerceAuthMode=searchToken` | empty |
 | `coveoCommerceSearchTokenServiceUrl` | Optional override for the search-token endpoint URL | `https://<org>.org.coveo.com/rest/search/token` |
 | `coveoCommerceSearchTokenSecurityProvider` | Security identity provider used when minting search tokens | `Email Security Provider` |
@@ -65,3 +66,4 @@ https://platform.cloud.coveo.com/rest/organizations/<ORG_ID>/commerce/v2
 - `trackingId`, language, country, locale, currency, search hub, and pipeline can still be overridden per request by passing values into `CommerceApiService`.
 - Query suggestion and recommendation payloads can include additional context fields from the storefront layer.
 - If you need a specific user identity, groups, or filter in a search token, pass `searchTokenOptions` into `CommerceApiService` from an overriding controller or service layer.
+- `coveoCommerceSearchBoxRecommendationSlotId` is only consumed by the temporary `app_mondou_coveo` overlay. The generic `int_coveo_commerce` cartridge remains independent from that Mondou-specific bootstrap concern.

@@ -56,8 +56,6 @@
         <input type="hidden" class="set-store-url" value="${URLUtils.url('Stores-SetStore')}"/>
         <input type="hidden" class="load-more-plp" value="${Resource.msg('button.more.plp', 'search', null)}"/>
         <input type="hidden" class="load-less-plp" value="${Resource.msg('button.less.plp', 'search', null)}"/>
-        <isif condition="${!pdict.disableMondouCoveoBundle}">
-            <script src="https://poc-beacon.coveodemo.com/v2/mondou/bundle.js" type="module" async defer></script>
-        </isif>
+        <script defer type="text/javascript" src="${URLUtils.staticURL('/js/coveoSearchBox.js')}"></script>
     </body>
 </html>

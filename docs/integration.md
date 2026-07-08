@@ -22,6 +22,7 @@ The cartridge includes thin sample controllers:
 
 - `Search-Show`
 - `Search-Suggest`
+- `Search-ProductSuggestions`
 - `Search-Recommendations`
 - `Category-Show`
 
@@ -63,6 +64,7 @@ Current starter scope:
 
 - query search only
 - sort and refinement flows backed by `CommerceApiService.search()`
+- header search box backed by `SearchBox-Bootstrap`, `SearchBox-Suggest`, and `SearchBox-Preview`
 - minimal template overrides to remove native `ProductSearchModel` assumptions
 - native category handling preserved for now
 

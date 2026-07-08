@@ -110,6 +110,33 @@ server.get('Suggest', function (req, res, next) {
     return next();
 });
 
+server.get('ProductSuggestions', function (req, res, next) {
+    var params = buildParams(req);
+    var suggestions;
+
+    try {
+        suggestions = CommerceApiService.productSuggest(params);
+        res.json({
+            products: suggestions.products,
+            responseId: suggestions.responseId,
+            queryUid: suggestions.queryUid,
+            analytics: suggestions.analytics
+        });
+    } catch (error) {
+        Logger.error('Coveo product suggest failed.', {
+            message: error.message
+        });
+
+        setStatus(res, 502);
+        res.json({
+            error: true,
+            message: 'Unable to retrieve Coveo product suggestions.'
+        });
+    }
+
+    return next();
+});
+
 server.get('Recommendations', function (req, res, next) {
     var params = buildParams(req);
     var recommendations;

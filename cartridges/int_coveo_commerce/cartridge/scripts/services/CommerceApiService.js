@@ -10,13 +10,15 @@ var UrlHelper = require('*/cartridge/scripts/helpers/UrlHelper');
 var SearchResultMapper = require('*/cartridge/scripts/mappers/SearchResultMapper');
 var ListingResultMapper = require('*/cartridge/scripts/mappers/ListingResultMapper');
 var RecommendationMapper = require('*/cartridge/scripts/mappers/RecommendationMapper');
+var ProductSuggestionMapper = require('*/cartridge/scripts/mappers/ProductSuggestionMapper');
 var AnalyticsService = require('*/cartridge/scripts/services/AnalyticsService');
 var HttpClient = require('*/cartridge/scripts/services/HttpClient');
 
 var ENDPOINTS = {
     SEARCH: 'search',
     LISTING: 'listing',
-    QUERY_SUGGEST: 'query-suggest',
+    QUERY_SUGGEST: 'search/querySuggest',
+    PRODUCT_SUGGEST: 'search/productSuggest',
     RECOMMENDATIONS: 'recommendations'
 };
 
@@ -122,9 +124,11 @@ function normalizeSuggestions(response, analyticsContext) {
             };
         }),
         responseId: source.responseId || '',
+        queryUid: source.queryUid || '',
         analytics: {
             clientId: analyticsContext.clientId || '',
             responseId: source.responseId || '',
+            queryUid: source.queryUid || '',
             searchHub: analyticsContext.searchHub || '',
             pipeline: analyticsContext.pipeline || ''
         }
@@ -193,6 +197,22 @@ function querySuggest(params) {
     return normalizeSuggestions(response.data, analyticsContext);
 }
 
+function productSuggest(params) {
+    var requestParams = params || {};
+    var settings = Config.getSettings();
+    var analyticsContext;
+    var payload;
+    var response;
+
+    validateConfiguration(settings);
+    analyticsContext = buildAnalyticsContext(requestParams);
+    payload = QueryBuilder.buildProductSuggestPayload(requestParams, settings, analyticsContext);
+    validatePayload('productSuggest', payload);
+    response = execute('productSuggest', ENDPOINTS.PRODUCT_SUGGEST, payload, requestParams, settings);
+
+    return ProductSuggestionMapper.map(response.data, requestParams, analyticsContext);
+}
+
 function recommendations(params) {
     var requestParams = params || {};
     var settings = Config.getSettings();
@@ -215,5 +235,6 @@ module.exports = {
     search: search,
     listing: listing,
     querySuggest: querySuggest,
+    productSuggest: productSuggest,
     recommendations: recommendations
 };

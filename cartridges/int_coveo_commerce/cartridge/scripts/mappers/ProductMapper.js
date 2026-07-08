@@ -40,6 +40,21 @@ function mapImage(product) {
     return product.image || product.imageUrl || product.thumbnail || product.ec_image || '';
 }
 
+function mapBrand(product) {
+    var brand = product && (
+        product.brand ||
+        product.ec_brand ||
+        product.productBrand ||
+        product.ec_brand_name
+    );
+
+    if (Object.prototype.toString.call(brand) === '[object Array]') {
+        return brand.length ? brand[0] : '';
+    }
+
+    return brand || '';
+}
+
 function map(product) {
     var source = product || {};
 
@@ -50,6 +65,7 @@ function map(product) {
         url: source.url || source.productUrl || source.clickUri || '',
         image: mapImage(source),
         price: mapPrice(source),
+        brand: mapBrand(source),
         raw: source
     };
 }

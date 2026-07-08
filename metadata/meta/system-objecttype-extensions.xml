@@ -34,6 +34,14 @@
                 <mandatory-flag>false</mandatory-flag>
                 <externally-managed-flag>false</externally-managed-flag>
             </attribute-definition>
+            <attribute-definition attribute-id="coveoCommerceSearchBoxRecommendationSlotId">
+                <display-name xml:lang="x-default">Coveo Search Box Recommendation Slot ID</display-name>
+                <description xml:lang="x-default">Optional recommendation slot used by the temporary Mondou search-box overlay to request popular products on focus.</description>
+                <type>string</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+            </attribute-definition>
             <attribute-definition attribute-id="coveoCommerceAuthMode">
                 <display-name xml:lang="x-default">Coveo Commerce Authentication Mode</display-name>
                 <description xml:lang="x-default">Authentication mode for the integration. Supported values are apiKey and searchToken.</description>
@@ -186,6 +194,7 @@
                 <attribute attribute-id="coveoCommerceApiEndpoint"/>
                 <attribute attribute-id="coveoCommerceApiToken"/>
                 <attribute attribute-id="coveoCommerceTrackingId"/>
+                <attribute attribute-id="coveoCommerceSearchBoxRecommendationSlotId"/>
                 <attribute attribute-id="coveoCommerceAuthMode"/>
                 <attribute attribute-id="coveoCommerceAuthenticatedSearchApiKey"/>
                 <attribute attribute-id="coveoCommerceSearchTokenServiceUrl"/>
