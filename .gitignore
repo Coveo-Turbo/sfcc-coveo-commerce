@@ -1,4 +1,5 @@
 node_modules/
+dist/
 dw.json
 dw.*.json
 !dw.example.json

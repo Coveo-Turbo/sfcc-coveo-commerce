@@ -52,6 +52,30 @@ function validateConfiguration(settings) {
     }
 }
 
+function validatePayload(operationName, payload) {
+    var missing = [];
+
+    if (!payload.language) {
+        missing.push('language');
+    }
+
+    if (!payload.country) {
+        missing.push('country');
+    }
+
+    if (!payload.currency) {
+        missing.push('currency');
+    }
+
+    if (missing.length) {
+        throw new Error(
+            'Missing required Coveo Commerce request context for ' + operationName + ': ' +
+            missing.join(', ') +
+            '. Provide them through the storefront request, CommerceApiService params, or site preferences.'
+        );
+    }
+}
+
 function buildAnalyticsContext(params) {
     return AnalyticsService.buildRequestContext(
         getHttpRequest(params),
@@ -118,6 +142,7 @@ function search(params) {
     validateConfiguration(settings);
     analyticsContext = buildAnalyticsContext(requestParams);
     payload = QueryBuilder.buildSearchPayload(requestParams, settings, analyticsContext);
+    validatePayload('search', payload);
     response = execute('search', ENDPOINTS.SEARCH, payload, requestParams, settings);
     mapped = SearchResultMapper.map(response.data, requestParams, analyticsContext);
 
@@ -140,6 +165,7 @@ function listing(params) {
     validateConfiguration(settings);
     analyticsContext = buildAnalyticsContext(requestParams);
     payload = QueryBuilder.buildListingPayload(requestParams, settings, analyticsContext);
+    validatePayload('listing', payload);
     response = execute('listing', ENDPOINTS.LISTING, payload, requestParams, settings);
     mapped = ListingResultMapper.map(response.data, requestParams, analyticsContext);
 
@@ -161,6 +187,7 @@ function querySuggest(params) {
     validateConfiguration(settings);
     analyticsContext = buildAnalyticsContext(requestParams);
     payload = QueryBuilder.buildQuerySuggestPayload(requestParams, settings, analyticsContext);
+    validatePayload('querySuggest', payload);
     response = execute('querySuggest', ENDPOINTS.QUERY_SUGGEST, payload, requestParams, settings);
 
     return normalizeSuggestions(response.data, analyticsContext);
@@ -177,6 +204,7 @@ function recommendations(params) {
     validateConfiguration(settings);
     analyticsContext = buildAnalyticsContext(requestParams);
     payload = QueryBuilder.buildRecommendationsPayload(requestParams, settings, analyticsContext);
+    validatePayload('recommendations', payload);
     response = execute('recommendations', ENDPOINTS.RECOMMENDATIONS, payload, requestParams, settings);
     mapped = RecommendationMapper.map(response.data, requestParams, analyticsContext);
 

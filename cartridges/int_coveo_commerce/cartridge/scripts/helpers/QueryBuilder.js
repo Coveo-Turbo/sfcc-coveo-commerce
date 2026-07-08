@@ -62,57 +62,242 @@ function normalizeObject(value) {
     return parseJson(value, {});
 }
 
-function buildBaseContext(params, config, analyticsContext) {
-    var requestContext = normalizeObject(params.context);
+function parseLocale(value) {
+    var source = String(value || '').replace('_', '-').split('-');
+    var language = source[0] && /^[A-Za-z]{2,3}$/.test(source[0]) ? String(source[0]).toLowerCase() : '';
+    var country = source[1] && /^[A-Za-z]{2}$/.test(source[1]) ? String(source[1]).toUpperCase() : '';
 
-    requestContext.organizationId = config.organizationId;
-    requestContext.catalog = params.catalog || config.defaultCatalog;
-    requestContext.locale = params.locale || config.locale;
-    requestContext.currency = params.currency || config.currency;
-    requestContext.searchHub = params.searchHub || analyticsContext.searchHub || config.searchHub;
-    requestContext.pipeline = params.pipeline || analyticsContext.pipeline || config.pipeline;
-    requestContext.clientId = analyticsContext.clientId;
+    return {
+        language: language,
+        country: country
+    };
+}
+
+function getHttpRequest(params) {
+    if (params && params.request) {
+        return params.request;
+    }
+
+    if (typeof request !== 'undefined') {
+        return request;
+    }
+
+    return null;
+}
+
+function getRequestLocaleId(httpRequest) {
+    if (!httpRequest) {
+        return '';
+    }
+
+    if (httpRequest.locale) {
+        if (typeof httpRequest.locale === 'string') {
+            return String(httpRequest.locale);
+        }
+
+        if (httpRequest.locale.id) {
+            return String(httpRequest.locale.id);
+        }
+    }
+
+    if (httpRequest.getLocale) {
+        return String(httpRequest.getLocale());
+    }
+
+    return '';
+}
+
+function getRequestCurrency(httpRequest) {
+    var currentSession = httpRequest && httpRequest.session ? httpRequest.session : null;
+
+    if (currentSession && currentSession.currency && currentSession.currency.currencyCode) {
+        return String(currentSession.currency.currencyCode);
+    }
+
+    return '';
+}
+
+function buildCurrentUrl(httpRequest) {
+    var httpUrl = httpRequest && httpRequest.httpURL && httpRequest.httpURL.toString ? httpRequest.httpURL.toString() : '';
+    var queryString = httpRequest && httpRequest.httpQueryString ? String(httpRequest.httpQueryString) : '';
+
+    if (httpUrl && queryString) {
+        return httpUrl + '?' + queryString;
+    }
+
+    return httpUrl;
+}
+
+function buildBaseContext(params) {
+    var requestContext = normalizeObject(params.context);
+    var httpRequest = getHttpRequest(params);
+    var userAgent = httpRequest && httpRequest.httpUserAgent ? String(httpRequest.httpUserAgent) : '';
+    var referrer = httpRequest && httpRequest.httpReferer ? String(httpRequest.httpReferer) : '';
+    var locationUrl = params.currentUrl || buildCurrentUrl(httpRequest);
+
+    requestContext.view = requestContext.view || {};
+    requestContext.view.url = requestContext.view.url || locationUrl;
+    requestContext.capture = typeof requestContext.capture === 'boolean' ? requestContext.capture : true;
+    requestContext.cart = requestContext.cart || [];
+
+    if (userAgent || referrer) {
+        requestContext.user = requestContext.user || {};
+        requestContext.user.userAgent = requestContext.user.userAgent || userAgent;
+        requestContext.user.referrer = requestContext.user.referrer || referrer;
+    }
 
     return requestContext;
 }
 
-function buildSearchPayload(params, config, analyticsContext) {
+function buildCommerceContext(params, config) {
+    var httpRequest = getHttpRequest(params);
+    var parsedRequestLocale = parseLocale((params && params.locale) || getRequestLocaleId(httpRequest));
+
     return {
-        query: params.q || params.query || '',
-        page: normalizeNumber(params.page, 1),
-        perPage: normalizeNumber(params.perPage || params.sz, 12),
-        sort: params.sort || '',
-        facets: normalizeArray(params.facets),
-        filters: normalizeObject(params.filters || params.refinements),
-        context: buildBaseContext(params, config, analyticsContext)
+        language: params.language || parsedRequestLocale.language || config.language,
+        country: params.country || parsedRequestLocale.country || config.country,
+        currency: params.currency || getRequestCurrency(httpRequest) || config.currency
     };
+}
+
+function decodeSort(value) {
+    var parsed = parseJson(value, null);
+
+    if (parsed && typeof parsed === 'object') {
+        return parsed;
+    }
+
+    if (!value) {
+        return {
+            sortCriteria: 'relevance'
+        };
+    }
+
+    if (typeof value === 'object') {
+        return value;
+    }
+
+    if (value === 'relevance') {
+        return {
+            sortCriteria: 'relevance'
+        };
+    }
+
+    return null;
+}
+
+function buildFacetValue(value) {
+    var source = String(value || '');
+    var parts;
+
+    if (source.indexOf('range:') === 0) {
+        parts = source.split(':');
+
+        return {
+            state: 'selected',
+            start: parseFloat(parts[1]),
+            end: parseFloat(parts[2]),
+            endInclusive: parts[3] !== '0'
+        };
+    }
+
+    return {
+        state: 'selected',
+        value: source
+    };
+}
+
+function buildFacets(filters) {
+    var source = normalizeObject(filters);
+
+    return Object.keys(source).map(function (facetId) {
+        var values = source[facetId];
+
+        return {
+            facetId: facetId,
+            field: facetId,
+            type: (values || []).some(function (entry) {
+                return String(entry || '').indexOf('range:') === 0;
+            }) ? 'numericalRange' : 'regular',
+            values: normalizeArray(values).map(buildFacetValue)
+        };
+    }).filter(function (facet) {
+        return facet.values.length > 0;
+    });
+}
+
+function buildSearchPayload(params, config, analyticsContext) {
+    var commerceContext = buildCommerceContext(params, config);
+    var payload = {
+        trackingId: params.trackingId || config.trackingId,
+        clientId: analyticsContext.clientId,
+        language: commerceContext.language,
+        country: commerceContext.country,
+        currency: commerceContext.currency,
+        query: params.q || params.query || '',
+        page: normalizeNumber(params.page, 0),
+        perPage: normalizeNumber(params.perPage || params.sz, 12),
+        sort: decodeSort(params.sort),
+        context: buildBaseContext(params)
+    };
+
+    payload.facets = buildFacets(params.filters || params.refinements || params.facets);
+
+    if (!payload.facets.length) {
+        delete payload.facets;
+    }
+
+    return payload;
 }
 
 function buildListingPayload(params, config, analyticsContext) {
-    return {
-        categoryId: params.categoryId || params.cgid || '',
-        page: normalizeNumber(params.page, 1),
+    var commerceContext = buildCommerceContext(params, config);
+    var payload = {
+        trackingId: params.trackingId || config.trackingId,
+        clientId: analyticsContext.clientId,
+        language: commerceContext.language,
+        country: commerceContext.country,
+        currency: commerceContext.currency,
+        page: normalizeNumber(params.page, 0),
         perPage: normalizeNumber(params.perPage || params.sz, 12),
-        sort: params.sort || '',
-        facets: normalizeArray(params.facets),
-        filters: normalizeObject(params.filters || params.refinements),
-        context: buildBaseContext(params, config, analyticsContext)
+        sort: decodeSort(params.sort),
+        context: buildBaseContext(params)
     };
+
+    payload.facets = buildFacets(params.filters || params.refinements || params.facets);
+
+    if (!payload.facets.length) {
+        delete payload.facets;
+    }
+
+    return payload;
 }
 
 function buildQuerySuggestPayload(params, config, analyticsContext) {
+    var commerceContext = buildCommerceContext(params, config);
     return {
+        trackingId: params.trackingId || config.trackingId,
+        clientId: analyticsContext.clientId,
+        language: commerceContext.language,
+        country: commerceContext.country,
+        currency: commerceContext.currency,
         query: params.q || params.query || '',
         count: normalizeNumber(params.count, 5),
-        context: buildBaseContext(params, config, analyticsContext)
+        context: buildBaseContext(params)
     };
 }
 
 function buildRecommendationsPayload(params, config, analyticsContext) {
+    var commerceContext = buildCommerceContext(params, config);
     return {
         slotId: params.slotId || '',
         productId: params.productId || params.pid || '',
-        context: buildBaseContext(params, config, analyticsContext)
+        trackingId: params.trackingId || config.trackingId,
+        clientId: analyticsContext.clientId,
+        language: commerceContext.language,
+        country: commerceContext.country,
+        currency: commerceContext.currency,
+        context: buildBaseContext(params)
     };
 }
 

@@ -53,6 +53,36 @@ In this cartridge, the minted search token is used by the server-side integratio
 - Connect recommendation slots to `Search-Recommendations`
 - Push analytics events through GTM or another tracking layer
 
+## Mondou Validation Overlay
+
+For Mondou, this repository currently includes a temporary validation cartridge named `app_mondou_coveo`.
+
+Its purpose is to show the refactoring seam between Mondou storefront code and `int_coveo_commerce` without forcing a full migration in one step.
+
+Current starter scope:
+
+- query search only
+- sort and refinement flows backed by `CommerceApiService.search()`
+- minimal template overrides to remove native `ProductSearchModel` assumptions
+- native category handling preserved for now
+
+This gives the Mondou team a safe incremental path:
+
+```text
+Search request with q
+    -> app_mondou_coveo/Search.js
+    -> int_coveo_commerce/CommerceApiService.search()
+    -> Coveo Commerce API
+
+Category request with cgid
+    -> app_mondou_coveo/Search.js
+    -> native Mondou search flow
+```
+
+Later phases can move category pages, query suggest, and deeper analytics behavior into the overlay once the search-only path is validated.
+
+Once that shape is stable, `app_mondou_coveo` should be extracted from this repo and delivered through a Mondou-specific source boundary.
+
 ## Companion Repository
 
 Use `sfcc-coveo-catalog-ingestion` alongside this repository when you need catalog synchronization from SFCC into Coveo. This repository is focused on runtime API integration only.

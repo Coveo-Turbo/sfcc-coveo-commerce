@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata xmlns="http://www.demandware.com/xml/impex/metadata/2006-10-31">
+    <type-extension type-id="SitePreferences">
+        <custom-attribute-definitions>
+            <attribute-definition attribute-id="coveoCommerceOrganizationId">
+                <display-name xml:lang="x-default">Coveo Commerce Organization ID</display-name>
+                <description xml:lang="x-default">Coveo organization identifier used by the Commerce API integration.</description>
+                <type>string</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+            </attribute-definition>
+            <attribute-definition attribute-id="coveoCommerceApiEndpoint">
+                <display-name xml:lang="x-default">Coveo Commerce API Endpoint</display-name>
+                <description xml:lang="x-default">Base endpoint for Commerce API requests, for example https://platform.cloud.coveo.com/rest/organizations/&lt;ORG_ID&gt;/commerce/v2.</description>
+                <type>string</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+            </attribute-definition>
+            <attribute-definition attribute-id="coveoCommerceApiToken">
+                <display-name xml:lang="x-default">Coveo Commerce API Token</display-name>
+                <description xml:lang="x-default">Shared bearer token used when the cartridge runs in apiKey authentication mode.</description>
+                <type>string</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+            </attribute-definition>
+            <attribute-definition attribute-id="coveoCommerceTrackingId">
+                <display-name xml:lang="x-default">Coveo Commerce Tracking ID</display-name>
+                <description xml:lang="x-default">Tracking ID associated with the storefront experience in Coveo Commerce.</description>
+                <type>string</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+            </attribute-definition>
+            <attribute-definition attribute-id="coveoCommerceAuthMode">
+                <display-name xml:lang="x-default">Coveo Commerce Authentication Mode</display-name>
+                <description xml:lang="x-default">Authentication mode for the integration. Supported values are apiKey and searchToken.</description>
+                <type>string</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+                <default-value>apiKey</default-value>
+            </attribute-definition>
+            <attribute-definition attribute-id="coveoCommerceAuthenticatedSearchApiKey">
+                <display-name xml:lang="x-default">Coveo Authenticated Search API Key</display-name>
+                <description xml:lang="x-default">Private API key used server-side to mint Coveo search tokens when the cartridge runs in searchToken mode.</description>
+                <type>string</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+            </attribute-definition>
+            <attribute-definition attribute-id="coveoCommerceSearchTokenServiceUrl">
+                <display-name xml:lang="x-default">Coveo Search Token Service URL</display-name>
+                <description xml:lang="x-default">Optional override for the search token endpoint. Leave empty to use the default Coveo token URL for the configured organization.</description>
+                <type>string</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+            </attribute-definition>
+            <attribute-definition attribute-id="coveoCommerceSearchTokenSecurityProvider">
+                <display-name xml:lang="x-default">Coveo Search Token Security Provider</display-name>
+                <description xml:lang="x-default">Security identity provider used when minting search tokens.</description>
+                <type>string</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+                <default-value>Email Security Provider</default-value>
+            </attribute-definition>
+            <attribute-definition attribute-id="coveoCommerceSearchTokenUserType">
+                <display-name xml:lang="x-default">Coveo Search Token User Type</display-name>
+                <description xml:lang="x-default">Default user type used when minting search tokens.</description>
+                <type>string</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+                <default-value>User</default-value>
+            </attribute-definition>
+            <attribute-definition attribute-id="coveoCommerceSearchTokenValidityMillis">
+                <display-name xml:lang="x-default">Coveo Search Token Validity Millis</display-name>
+                <description xml:lang="x-default">Search token lifetime in milliseconds.</description>
+                <type>int</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+                <default-value>3600000</default-value>
+            </attribute-definition>
+            <attribute-definition attribute-id="coveoCommerceDefaultCatalog">
+                <display-name xml:lang="x-default">Coveo Commerce Default Catalog</display-name>
+                <description xml:lang="x-default">Optional default catalog identifier used by the integration layer.</description>
+                <type>string</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+            </attribute-definition>
+            <attribute-definition attribute-id="coveoCommerceLocale">
+                <display-name xml:lang="x-default">Coveo Commerce Locale Fallback</display-name>
+                <description xml:lang="x-default">Optional fallback locale, such as fr_CA, used when storefront request locale is not available.</description>
+                <type>string</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+            </attribute-definition>
+            <attribute-definition attribute-id="coveoCommerceLanguage">
+                <display-name xml:lang="x-default">Coveo Commerce Language Fallback</display-name>
+                <description xml:lang="x-default">Optional fallback language code. Storefront locale takes precedence at runtime.</description>
+                <type>string</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+            </attribute-definition>
+            <attribute-definition attribute-id="coveoCommerceCountry">
+                <display-name xml:lang="x-default">Coveo Commerce Country Fallback</display-name>
+                <description xml:lang="x-default">Optional fallback country code. Storefront locale takes precedence at runtime.</description>
+                <type>string</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+            </attribute-definition>
+            <attribute-definition attribute-id="coveoCommerceCurrency">
+                <display-name xml:lang="x-default">Coveo Commerce Currency Fallback</display-name>
+                <description xml:lang="x-default">Optional fallback currency code. The storefront session currency takes precedence at runtime.</description>
+                <type>string</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+            </attribute-definition>
+            <attribute-definition attribute-id="coveoCommerceSearchHub">
+                <display-name xml:lang="x-default">Coveo Commerce Search Hub</display-name>
+                <description xml:lang="x-default">Optional default search hub for Commerce API requests.</description>
+                <type>string</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+            </attribute-definition>
+            <attribute-definition attribute-id="coveoCommercePipeline">
+                <display-name xml:lang="x-default">Coveo Commerce Pipeline</display-name>
+                <description xml:lang="x-default">Optional default pipeline for Commerce API requests.</description>
+                <type>string</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+            </attribute-definition>
+            <attribute-definition attribute-id="coveoCommerceAnalyticsEnabled">
+                <display-name xml:lang="x-default">Coveo Commerce Analytics Enabled</display-name>
+                <description xml:lang="x-default">Controls clientId management and analytics metadata handling in the cartridge.</description>
+                <type>boolean</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+                <default-value>true</default-value>
+            </attribute-definition>
+            <attribute-definition attribute-id="coveoCommerceVerboseLogging">
+                <display-name xml:lang="x-default">Coveo Commerce Verbose Logging</display-name>
+                <description xml:lang="x-default">Enables verbose integration logging for troubleshooting.</description>
+                <type>boolean</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+                <default-value>false</default-value>
+            </attribute-definition>
+            <attribute-definition attribute-id="coveoCommerceTimeoutMillis">
+                <display-name xml:lang="x-default">Coveo Commerce Timeout Millis</display-name>
+                <description xml:lang="x-default">HTTP timeout in milliseconds for Commerce API calls.</description>
+                <type>int</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+                <default-value>5000</default-value>
+            </attribute-definition>
+            <attribute-definition attribute-id="coveoCommerceRetryCount">
+                <display-name xml:lang="x-default">Coveo Commerce Retry Count</display-name>
+                <description xml:lang="x-default">Retry count for retryable Commerce API failures.</description>
+                <type>int</type>
+                <localizable-flag>false</localizable-flag>
+                <mandatory-flag>false</mandatory-flag>
+                <externally-managed-flag>false</externally-managed-flag>
+                <default-value>1</default-value>
+            </attribute-definition>
+        </custom-attribute-definitions>
+        <group-definitions>
+            <attribute-group group-id="CoveoCommerce">
+                <display-name xml:lang="x-default">Coveo Commerce</display-name>
+                <attribute attribute-id="coveoCommerceOrganizationId"/>
+                <attribute attribute-id="coveoCommerceApiEndpoint"/>
+                <attribute attribute-id="coveoCommerceApiToken"/>
+                <attribute attribute-id="coveoCommerceTrackingId"/>
+                <attribute attribute-id="coveoCommerceAuthMode"/>
+                <attribute attribute-id="coveoCommerceAuthenticatedSearchApiKey"/>
+                <attribute attribute-id="coveoCommerceSearchTokenServiceUrl"/>
+                <attribute attribute-id="coveoCommerceSearchTokenSecurityProvider"/>
+                <attribute attribute-id="coveoCommerceSearchTokenUserType"/>
+                <attribute attribute-id="coveoCommerceSearchTokenValidityMillis"/>
+                <attribute attribute-id="coveoCommerceDefaultCatalog"/>
+                <attribute attribute-id="coveoCommerceLocale"/>
+                <attribute attribute-id="coveoCommerceLanguage"/>
+                <attribute attribute-id="coveoCommerceCountry"/>
+                <attribute attribute-id="coveoCommerceCurrency"/>
+                <attribute attribute-id="coveoCommerceSearchHub"/>
+                <attribute attribute-id="coveoCommercePipeline"/>
+                <attribute attribute-id="coveoCommerceAnalyticsEnabled"/>
+                <attribute attribute-id="coveoCommerceVerboseLogging"/>
+                <attribute attribute-id="coveoCommerceTimeoutMillis"/>
+                <attribute attribute-id="coveoCommerceRetryCount"/>
+            </attribute-group>
+        </group-definitions>
+    </type-extension>
+</metadata>

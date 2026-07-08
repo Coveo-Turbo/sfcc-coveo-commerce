@@ -13,9 +13,9 @@ function normalizeNumber(value, fallback) {
 function map(response, params) {
     var source = response || {};
     var requestParams = params || {};
-    var page = normalizeNumber(source.page || source.currentPage || requestParams.page, 1);
+    var page = normalizeNumber(source.page || source.currentPage || requestParams.page, 0);
     var perPage = normalizeNumber(source.perPage || source.pageSize || requestParams.perPage || requestParams.sz, 12);
-    var total = normalizeNumber(source.totalCount || source.total || source.totalResults, 0);
+    var total = normalizeNumber(source.totalEntries || source.totalCount || source.total || source.totalResults, 0);
     var totalPages = normalizeNumber(source.totalPages, 0);
 
     if (!totalPages && perPage > 0) {

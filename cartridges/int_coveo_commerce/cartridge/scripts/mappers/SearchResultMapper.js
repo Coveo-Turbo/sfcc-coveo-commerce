@@ -19,12 +19,14 @@ function mapFacets(response) {
 
 function map(response, params, analyticsContext) {
     var source = response || {};
+    var paginationSource = source.pagination || source;
+    var sortSource = source.sort || source;
 
     return {
         products: mapProducts(source),
         facets: mapFacets(source),
-        pagination: PaginationMapper.map(source, params),
-        sorting: SortMapper.map(source, params),
+        pagination: PaginationMapper.map(paginationSource, params),
+        sorting: SortMapper.map(sortSource, params),
         breadcrumbs: source.breadcrumbs || source.breadCrumbs || [],
         responseId: source.responseId || '',
         queryUid: source.queryUid || '',
