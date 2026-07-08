@@ -45,6 +45,14 @@ function normalizeNumber(value, fallback) {
     return parsed;
 }
 
+function normalizeBoolean(value) {
+    if (value === true || value === 'true' || value === '1') {
+        return true;
+    }
+
+    return false;
+}
+
 function safeDecode(value) {
     if (!value && value !== 0) {
         return '';
@@ -289,6 +297,10 @@ function cloneQuery(querystring) {
 
 function isCoveoSearchRequest(querystring) {
     return !!(querystring && querystring.q && !querystring.cgid);
+}
+
+function isCoveoDebugRequest(querystring) {
+    return !!(querystring && normalizeBoolean(querystring.coveoDebug));
 }
 
 function getPageSize(querystring) {
@@ -748,6 +760,7 @@ function buildSearchParams(req) {
     params.sortId = query.srule || '';
     params.filters = buildServiceFilters(query);
     params.currentCustomer = req.currentCustomer;
+    params.coveoDebug = isCoveoDebugRequest(query);
     params.request = getHttpRequest();
     params.response = getHttpResponse();
 

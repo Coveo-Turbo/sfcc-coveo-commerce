@@ -122,6 +122,10 @@ function buildCurrentUrl(httpRequest) {
     var queryString = httpRequest && httpRequest.httpQueryString ? String(httpRequest.httpQueryString) : '';
 
     if (httpUrl && queryString) {
+        if (httpUrl.indexOf('?') !== -1) {
+            return httpUrl;
+        }
+
         return httpUrl + '?' + queryString;
     }
 

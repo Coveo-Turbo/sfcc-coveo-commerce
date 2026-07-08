@@ -83,6 +83,18 @@ Later phases can move category pages, query suggest, and deeper analytics behavi
 
 Once that shape is stable, `app_mondou_coveo` should be extracted from this repo and delivered through a Mondou-specific source boundary.
 
+## Request Validation
+
+The Mondou validation overlay supports an opt-in query parameter for server-side Commerce request inspection:
+
+```text
+?q=chien&coveoDebug=1
+```
+
+When `coveoDebug=1` is present on search, sort, or refinement requests, the integration writes a sanitized request and response summary as warning-level custom log entries.
+In this cartridge, those entries are written to the `custom-CoveoCommerce-<instance>-<date>.log` file family.
+This debug mode is intended for validation only and does not expose authorization headers, bearer tokens, or search tokens.
+
 ## Companion Repository
 
 Use `sfcc-coveo-catalog-ingestion` alongside this repository when you need catalog synchronization from SFCC into Coveo. This repository is focused on runtime API integration only.

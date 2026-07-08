@@ -366,12 +366,6 @@ function logAndFallback(routeName, error) {
 }
 
 server.replace('Show', cache.applyShortPromotionSensitiveCache, consentTracking.consent, function (req, res, next) {
-    Logger.warn('Mondou Coveo overlay Search-Show reached.', {
-        query: req.querystring.q || '',
-        hasCategoryId: !!req.querystring.cgid,
-        isCoveoSearchRequest: coveoSearchHelper.isCoveoSearchRequest(req.querystring)
-    });
-
     addBazaarvoiceScout(res);
 
     if (!coveoSearchHelper.isCoveoSearchRequest(req.querystring)) {
