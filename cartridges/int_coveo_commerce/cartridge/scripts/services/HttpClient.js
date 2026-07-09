@@ -61,6 +61,31 @@ function parseJsonSafely(rawValue, fallback) {
     }
 }
 
+function getHttpResponse(authContext) {
+    if (authContext && authContext.response) {
+        return authContext.response;
+    }
+
+    if (typeof response !== 'undefined') {
+        return response;
+    }
+
+    return null;
+}
+
+function setResponseHeader() {
+    return;
+}
+
+function sanitizeHeaderValue(value, maxLength) {
+    return String(value || '')
+        .replace(/[\r\n]+/g, ' ')
+        .replace(/[^\x20-\x7E]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .replace(/^\s+|\s+$/g, '')
+        .slice(0, maxLength || 512);
+}
+
 function summarizeFacetValue(value) {
     if (!value) {
         return '';
@@ -87,6 +112,26 @@ function summarizeFacets(facets) {
             values: (facet.values || []).map(summarizeFacetValue)
         };
     });
+}
+
+function stringifyFacetValues(values) {
+    return (values || []).map(function (value) {
+        if (typeof value === 'string') {
+            return value;
+        }
+
+        if (typeof value.value !== 'undefined') {
+            return String(value.value);
+        }
+
+        if (typeof value.start !== 'undefined' || typeof value.end !== 'undefined') {
+            return [value.start, value.end].join('-');
+        }
+
+        return '';
+    }).filter(function (value) {
+        return value;
+    }).join('|');
 }
 
 function summarizeContext(context) {
@@ -230,6 +275,74 @@ function buildFailureDebugSummary(operationName, error, attempt) {
     return summary;
 }
 
+function buildRequestDebugHeader(summary) {
+    var parts = [
+        'operation=' + summary.operation
+    ];
+    var facets = (summary.facets || []).map(function (facet) {
+        return facet.facetId + '=' + stringifyFacetValues(facet.values);
+    }).filter(function (facet) {
+        return facet;
+    }).join(',');
+
+    if (summary.query) {
+        parts.push('query=' + summary.query);
+    }
+
+    if (facets) {
+        parts.push('facets=' + facets);
+    }
+
+    if (summary.page !== null) {
+        parts.push('page=' + summary.page);
+    }
+
+    if (summary.perPage !== null) {
+        parts.push('perPage=' + summary.perPage);
+    }
+
+    return sanitizeHeaderValue(parts.join(';'));
+}
+
+function buildResponseDebugHeader(summary) {
+    var parts = [
+        'operation=' + summary.operation,
+        'status=' + summary.statusCode
+    ];
+
+    if (typeof summary.total !== 'undefined') {
+        parts.push('total=' + summary.total);
+    }
+
+    if (typeof summary.productCount !== 'undefined') {
+        parts.push('products=' + summary.productCount);
+    }
+
+    if (typeof summary.facetCount !== 'undefined') {
+        parts.push('facets=' + summary.facetCount);
+    }
+
+    if (summary.responseId) {
+        parts.push('responseId=' + summary.responseId);
+    }
+
+    return sanitizeHeaderValue(parts.join(';'));
+}
+
+function buildFailureDebugHeader(summary) {
+    var parts = [
+        'operation=' + summary.operation,
+        'attempt=' + summary.attempt,
+        'message=' + summary.message
+    ];
+
+    if (summary.statusCode) {
+        parts.push('status=' + summary.statusCode);
+    }
+
+    return sanitizeHeaderValue(parts.join(';'));
+}
+
 function isCoveoDebugEnabled(authContext) {
     return !!(authContext && normalizeBoolean(authContext.coveoDebug));
 }
@@ -297,21 +410,32 @@ function request(options) {
     var retryCount = typeof requestOptions.retryCount === 'number' ? requestOptions.retryCount : settings.retryCount;
     var maxAttempts = Math.max(1, retryCount + 1);
     var debugEnabled = isCoveoDebugEnabled(requestOptions.authContext);
+    var httpResponse = getHttpResponse(requestOptions.authContext);
     var response;
     var attempt;
     var error;
+    var requestDebugSummary;
+    var responseDebugSummary;
+    var failureDebugSummary;
 
     if (payload && typeof payload !== 'string') {
         payload = JSON.stringify(payload);
     }
 
     if (debugEnabled) {
-        Logger.warn('Coveo Commerce debug request.', buildRequestDebugSummary(
+        requestDebugSummary = buildRequestDebugSummary(
             operationName,
             method,
             requestOptions.url,
             requestOptions.body
-        ));
+        );
+
+        setResponseHeader(
+            httpResponse,
+            'X-Coveo-Commerce-Debug-Request',
+            buildRequestDebugHeader(requestDebugSummary)
+        );
+        Logger.warn('Coveo Commerce debug request.', requestDebugSummary);
     }
 
     for (attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -331,11 +455,18 @@ function request(options) {
             });
 
             if (debugEnabled) {
-                Logger.warn('Coveo Commerce debug response.', buildResponseDebugSummary(
+                responseDebugSummary = buildResponseDebugSummary(
                     operationName,
                     response,
                     attempt
-                ));
+                );
+
+                setResponseHeader(
+                    httpResponse,
+                    'X-Coveo-Commerce-Debug-Response',
+                    buildResponseDebugHeader(responseDebugSummary)
+                );
+                Logger.warn('Coveo Commerce debug response.', responseDebugSummary);
             }
 
             return response;
@@ -350,11 +481,18 @@ function request(options) {
             });
 
             if (debugEnabled) {
-                Logger.warn('Coveo Commerce debug failure.', buildFailureDebugSummary(
+                failureDebugSummary = buildFailureDebugSummary(
                     operationName,
                     requestError,
                     attempt
-                ));
+                );
+
+                setResponseHeader(
+                    httpResponse,
+                    'X-Coveo-Commerce-Debug-Failure',
+                    buildFailureDebugHeader(failureDebugSummary)
+                );
+                Logger.warn('Coveo Commerce debug failure.', failureDebugSummary);
             }
 
             if (attempt >= maxAttempts || !isRetryable(requestError)) {

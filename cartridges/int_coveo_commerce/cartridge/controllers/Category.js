@@ -32,6 +32,7 @@ function buildParams(req) {
 
     params.categoryId = params.categoryId || params.cgid || '';
     params.currentCustomer = req.currentCustomer;
+    params.session = req.session;
     params.request = getHttpRequest();
     params.response = getHttpResponse();
 

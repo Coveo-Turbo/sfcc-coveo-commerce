@@ -31,6 +31,7 @@ function buildParams(req) {
     });
 
     params.currentCustomer = req.currentCustomer;
+    params.session = req.session;
     params.request = getHttpRequest();
     params.response = getHttpResponse();
 

@@ -282,13 +282,38 @@ function resolveRenderableProductId(product, renderableProductCache) {
     return '';
 }
 
+function normalizeQueryValue(value) {
+    var normalizedEntries;
+
+    if (value === null || typeof value === 'undefined' || value === '') {
+        return '';
+    }
+
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        return String(value);
+    }
+
+    if (Object.prototype.toString.call(value) === '[object Array]') {
+        normalizedEntries = value.map(normalizeQueryValue).filter(function (entry) {
+            return entry !== '';
+        });
+
+        return normalizedEntries.length ? normalizedEntries.join(',') : '';
+    }
+
+    return '';
+}
+
 function cloneQuery(querystring) {
     var source = querystring || {};
     var target = {};
+    var normalizedValue;
 
     Object.keys(source).forEach(function (key) {
-        if (typeof source[key] !== 'undefined' && source[key] !== null && source[key] !== '') {
-            target[key] = String(source[key]);
+        normalizedValue = normalizeQueryValue(source[key]);
+
+        if (normalizedValue !== '') {
+            target[key] = normalizedValue;
         }
     });
 
@@ -352,6 +377,19 @@ function splitFacetValues(rawValues) {
 function parseFacetSelections(querystring) {
     var query = querystring || {};
     var filters = {};
+
+    if (query.preferences && typeof query.preferences === 'object') {
+        Object.keys(query.preferences).forEach(function (attributeId) {
+            var preferenceValue = query.preferences[attributeId];
+
+            if (typeof preferenceValue === 'object' && preferenceValue !== null) {
+                filters[attributeId] = preferenceValue;
+                return;
+            }
+
+            filters[attributeId] = splitFacetValues(preferenceValue);
+        });
+    }
 
     Object.keys(query).forEach(function (key) {
         var match = key.match(/^prefn(\d+)$/);
@@ -595,19 +633,64 @@ function resolveValueMetadata(mappedValue, rawValue, attributeId) {
     };
 }
 
-function mapRefinementValues(refinement, rawRefinement, querystring, visibleCount) {
-    return (refinement.values || []).map(function (value, index) {
-        var rawValue = rawRefinement && rawRefinement.values && rawRefinement.values[index] ? rawRefinement.values[index] : {};
-        var valueId = String(value.id || value.label || '');
-        var metadata = resolveValueMetadata(value, rawValue, refinement.id);
+function resolveFacetRequestId(refinement, rawRefinement) {
+    var source = rawRefinement || {};
 
-        if (refinement.type === 'numericalRange' && typeof rawValue.start !== 'undefined' && typeof rawValue.end !== 'undefined') {
-            valueId = ['range', rawValue.start, rawValue.end, rawValue.endInclusive === false ? '0' : '1'].join(':');
-        }
+    return String(source.field || source.facetId || refinement.id || '');
+}
+
+function resolveFacetValueId(value, rawValue, refinement) {
+    var source = rawValue || {};
+
+    if (refinement.type === 'numericalRange' && typeof source.start !== 'undefined' && typeof source.end !== 'undefined') {
+        return ['range', source.start, source.end, source.endInclusive === false ? '0' : '1'].join(':');
+    }
+
+    if (source.path && typeof source.path.length === 'number' && source.path.length) {
+        return source.path.join('|');
+    }
+
+    if (typeof source.value !== 'undefined' && source.value !== null && source.value !== '') {
+        return String(source.value);
+    }
+
+    if (typeof source.name !== 'undefined' && source.name !== null && source.name !== '') {
+        return String(source.name);
+    }
+
+    if (typeof source.id !== 'undefined' && source.id !== null && source.id !== '') {
+        return String(source.id);
+    }
+
+    return String(value.id || value.label || '');
+}
+
+function getRawRefinementValues(rawRefinement) {
+    var source = rawRefinement || {};
+
+    if (source.values && source.values.length) {
+        return source.values;
+    }
+
+    if (source.options && source.options.length) {
+        return source.options;
+    }
+
+    return [];
+}
+
+function mapRefinementValues(refinement, rawRefinement, querystring, visibleCount) {
+    var facetRequestId = resolveFacetRequestId(refinement, rawRefinement);
+    var rawValues = getRawRefinementValues(rawRefinement);
+
+    return (refinement.values || []).map(function (value, index) {
+        var rawValue = rawValues[index] || {};
+        var valueId = resolveFacetValueId(value, rawValue, refinement);
+        var metadata = resolveValueMetadata(value, rawValue, refinement.id);
 
         return {
             id: valueId,
-            url: buildFacetToggleUrl(querystring, refinement.id, valueId, visibleCount),
+            url: buildFacetToggleUrl(querystring, facetRequestId, valueId, visibleCount),
             selected: value.selected === true,
             selectable: value.count > 0 || value.selected === true,
             displayValue: metadata.displayValue,
@@ -750,7 +833,8 @@ function buildProductSearch(searchResult, querystring) {
 }
 
 function buildSearchParams(req) {
-    var query = cloneQuery(req.querystring);
+    var rawQuery = req.querystring || {};
+    var query = cloneQuery(rawQuery);
     var params = cloneQuery(req.querystring);
 
     params.query = query.q || '';
@@ -758,7 +842,7 @@ function buildSearchParams(req) {
     params.perPage = getPageSize(query);
     params.sort = parseJson(query.coveosort, query.sort || '');
     params.sortId = query.srule || '';
-    params.filters = buildServiceFilters(query);
+    params.filters = buildServiceFilters(rawQuery);
     params.currentCustomer = req.currentCustomer;
     params.coveoDebug = isCoveoDebugRequest(query);
     params.request = getHttpRequest();
@@ -770,7 +854,7 @@ function buildSearchParams(req) {
 function search(req) {
     var params = buildSearchParams(req);
     var searchResult = CommerceApiService.search(params);
-    var productSearch = buildProductSearch(searchResult, cloneQuery(req.querystring));
+    var productSearch = buildProductSearch(searchResult, req.querystring || {});
 
     Logger.debug('Mapped Mondou Coveo search response.', {
         query: params.query,

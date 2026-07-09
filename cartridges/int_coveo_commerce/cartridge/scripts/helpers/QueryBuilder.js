@@ -62,6 +62,10 @@ function normalizeObject(value) {
     return parseJson(value, {});
 }
 
+function isArray(value) {
+    return Object.prototype.toString.call(value) === '[object Array]';
+}
+
 function parseLocale(value) {
     var source = String(value || '').replace('_', '-').split('-');
     var language = source[0] && /^[A-Za-z]{2,3}$/.test(source[0]) ? String(source[0]).toLowerCase() : '';
@@ -190,9 +194,41 @@ function decodeSort(value) {
     return null;
 }
 
+function isRangeObject(value) {
+    return !!(value && typeof value === 'object' && (
+        (typeof value.start !== 'undefined' && typeof value.end !== 'undefined') ||
+        (typeof value.min !== 'undefined' && typeof value.max !== 'undefined')
+    ));
+}
+
+function isRangeSelection(value) {
+    return (typeof value === 'string' && value.indexOf('range:') === 0) || isRangeObject(value);
+}
+
+function normalizeFacetSelections(value) {
+    if (isArray(value)) {
+        return value;
+    }
+
+    if (isRangeObject(value)) {
+        return [value];
+    }
+
+    return normalizeArray(value);
+}
+
 function buildFacetValue(value) {
     var source = String(value || '');
     var parts;
+
+    if (isRangeObject(value)) {
+        return {
+            state: 'selected',
+            start: parseFloat(typeof value.start !== 'undefined' ? value.start : value.min),
+            end: parseFloat(typeof value.end !== 'undefined' ? value.end : value.max),
+            endInclusive: value.endInclusive !== false
+        };
+    }
 
     if (source.indexOf('range:') === 0) {
         parts = source.split(':');
@@ -212,18 +248,26 @@ function buildFacetValue(value) {
 }
 
 function buildFacets(filters) {
-    var source = normalizeObject(filters);
+    var source;
+
+    if (isArray(filters)) {
+        return filters.filter(function (facet) {
+            return facet && facet.values && facet.values.length > 0;
+        });
+    }
+
+    source = normalizeObject(filters);
 
     return Object.keys(source).map(function (facetId) {
-        var values = source[facetId];
+        var values = normalizeFacetSelections(source[facetId]);
 
         return {
             facetId: facetId,
             field: facetId,
-            type: (values || []).some(function (entry) {
-                return String(entry || '').indexOf('range:') === 0;
+            type: values.some(function (entry) {
+                return isRangeSelection(entry);
             }) ? 'numericalRange' : 'regular',
-            values: normalizeArray(values).map(buildFacetValue)
+            values: values.map(buildFacetValue)
         };
     }).filter(function (facet) {
         return facet.values.length > 0;

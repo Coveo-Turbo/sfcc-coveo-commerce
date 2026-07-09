@@ -1,8 +1,11 @@
 'use strict';
+/* global session */
 
 var SFCCHttpClient = require('dw/net/HTTPClient');
 var Config = require('*/cartridge/scripts/config/Config');
 var Logger = require('*/cartridge/scripts/helpers/Logger');
+var TOKEN_CACHE_KEY = 'coveoCommerceSearchTokenCache';
+var TOKEN_CACHE_SAFETY_WINDOW_MILLIS = 5000;
 
 function getCurrentCustomer(context) {
     if (context && context.currentCustomer) {
@@ -26,6 +29,38 @@ function getTokenOptions(context) {
     }
 
     return {};
+}
+
+function getSessionContainer(context) {
+    if (context && context.session) {
+        return context.session;
+    }
+
+    if (typeof session !== 'undefined') {
+        return session;
+    }
+
+    return null;
+}
+
+function getPrivacyCache(context) {
+    var sessionContainer = getSessionContainer(context);
+
+    if (sessionContainer && sessionContainer.privacyCache && sessionContainer.privacyCache.get && sessionContainer.privacyCache.set) {
+        return sessionContainer.privacyCache;
+    }
+
+    return null;
+}
+
+function getPrivacyStore(context) {
+    var sessionContainer = getSessionContainer(context);
+
+    if (sessionContainer && sessionContainer.privacy) {
+        return sessionContainer.privacy;
+    }
+
+    return null;
 }
 
 function readSfraProfileValue(currentCustomer, propertyName) {
@@ -114,6 +149,139 @@ function normalizeStringArray(values) {
     }
 
     return [values];
+}
+
+function stableSerialize(value) {
+    var keys;
+
+    if (value === null || typeof value === 'undefined') {
+        return 'null';
+    }
+
+    if (Object.prototype.toString.call(value) === '[object Array]') {
+        return '[' + value.map(stableSerialize).join(',') + ']';
+    }
+
+    if (typeof value === 'object') {
+        keys = Object.keys(value).sort();
+
+        return '{' + keys.map(function (key) {
+            return JSON.stringify(key) + ':' + stableSerialize(value[key]);
+        }).join(',') + '}';
+    }
+
+    return JSON.stringify(value);
+}
+
+function parseCacheValue(value) {
+    if (!value) {
+        return {};
+    }
+
+    if (typeof value === 'object') {
+        return value;
+    }
+
+    try {
+        return JSON.parse(value);
+    } catch (error) {
+        return {};
+    }
+}
+
+function readCacheStore(context) {
+    var privacyCache = getPrivacyCache(context);
+    var privacyStore = getPrivacyStore(context);
+
+    if (privacyCache) {
+        return parseCacheValue(privacyCache.get(TOKEN_CACHE_KEY));
+    }
+
+    if (privacyStore && privacyStore[TOKEN_CACHE_KEY]) {
+        return parseCacheValue(privacyStore[TOKEN_CACHE_KEY]);
+    }
+
+    return {};
+}
+
+function writeCacheStore(context, value) {
+    var serialized = JSON.stringify(value || {});
+    var privacyCache = getPrivacyCache(context);
+    var privacyStore = getPrivacyStore(context);
+
+    if (privacyCache) {
+        privacyCache.set(TOKEN_CACHE_KEY, serialized);
+        return;
+    }
+
+    if (privacyStore) {
+        privacyStore[TOKEN_CACHE_KEY] = serialized;
+    }
+}
+
+function cleanExpiredCacheEntries(store, now) {
+    var cleaned = {};
+
+    Object.keys(store || {}).forEach(function (key) {
+        var entry = store[key];
+
+        if (!entry || !entry.token || !entry.expiresAt || entry.expiresAt <= now) {
+            return;
+        }
+
+        cleaned[key] = entry;
+    });
+
+    return cleaned;
+}
+
+function buildCacheKey(endpoint, payload) {
+    return endpoint + '::' + stableSerialize(payload);
+}
+
+function getCacheDurationMillis(validFor) {
+    var duration = parseInt(validFor, 10);
+
+    if (isNaN(duration) || duration <= 0) {
+        return 0;
+    }
+
+    if (duration <= TOKEN_CACHE_SAFETY_WINDOW_MILLIS) {
+        return Math.max(duration - 250, 0);
+    }
+
+    return duration - TOKEN_CACHE_SAFETY_WINDOW_MILLIS;
+}
+
+function readCachedToken(context, cacheKey) {
+    var now = new Date().getTime();
+    var store = cleanExpiredCacheEntries(readCacheStore(context), now);
+    var entry = store[cacheKey];
+
+    writeCacheStore(context, store);
+
+    if (!entry) {
+        return '';
+    }
+
+    return entry.token || '';
+}
+
+function cacheToken(context, cacheKey, token, validFor) {
+    var cacheDuration = getCacheDurationMillis(validFor);
+    var now = new Date().getTime();
+    var store;
+
+    if (!cacheDuration || !token) {
+        return;
+    }
+
+    store = cleanExpiredCacheEntries(readCacheStore(context), now);
+    store[cacheKey] = {
+        token: token,
+        expiresAt: now + cacheDuration
+    };
+    writeCacheStore(context, store);
 }
 
 function buildUserIds(context, settings) {
@@ -213,10 +381,20 @@ function requestSearchToken(context, settings) {
     var config = settings || Config.getSettings();
     var endpoint = getSearchTokenEndpoint(config);
     var payload = buildTokenRequestBody(context || {}, config);
+    var cacheKey = buildCacheKey(endpoint, payload);
     var httpClient = new SFCCHttpClient();
+    var cachedToken = readCachedToken(context, cacheKey);
     var responseText;
     var statusCode;
     var token;
+
+    if (cachedToken) {
+        Logger.debug('Reusing cached Coveo search token.', {
+            endpoint: endpoint
+        });
+
+        return cachedToken;
+    }
 
     httpClient.open('POST', endpoint);
     httpClient.setTimeout(config.timeoutMillis);
@@ -242,6 +420,8 @@ function requestSearchToken(context, settings) {
     if (!token) {
         throw new Error('Coveo search token service did not return a token value.');
     }
+
+    cacheToken(context, cacheKey, token, payload.validFor);
 
     Logger.info('Coveo search token generated.', {
         endpoint: endpoint,

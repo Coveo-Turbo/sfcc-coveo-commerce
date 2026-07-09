@@ -61,6 +61,7 @@ function buildBaseParams(req) {
 
     params.query = normalizeString(params.q || params.query || '');
     params.currentCustomer = req.currentCustomer;
+    params.session = req.session;
     params.request = getHttpRequest();
     params.response = getHttpResponse();
 

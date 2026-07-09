@@ -4,9 +4,20 @@
     var RECENT_SEARCHES_KEY = 'mondouCoveoRecentSearches';
     var MAX_RECENT_SEARCHES = 5;
     var DEBOUNCE_DELAY = 250;
+    var BOOTSTRAP_CACHE_TTL = 120000;
+    var QUERY_SUGGEST_CACHE_TTL = 30000;
+    var PRODUCT_PREVIEW_CACHE_TTL = 30000;
     var DOWN_KEY = 40;
     var UP_KEY = 38;
     var ENTER_KEY = 13;
+    var REQUEST_TYPES = {
+        BOOTSTRAP: 'bootstrap',
+        SUGGEST: 'suggest',
+        PREVIEW: 'preview'
+    };
+    var bootstrapCache = {};
+    var suggestCache = {};
+    var previewCache = {};
 
     function normalizeString(value) {
         return $.trim(String(value || ''));
@@ -24,6 +35,131 @@
                 fn.apply(context, args);
             }, wait);
         };
+    }
+
+    function getNow() {
+        return new Date().getTime();
+    }
+
+    function buildCacheKey(url, query) {
+        return String(url || '') + '::' + String(query || '');
+    }
+
+    function readCache(cache, key, ttl) {
+        var entry = cache[key];
+
+        if (!entry) {
+            return null;
+        }
+
+        if ((getNow() - entry.cachedAt) > ttl) {
+            delete cache[key];
+            return null;
+        }
+
+        return entry.payload;
+    }
+
+    function writeCache(cache, key, payload) {
+        cache[key] = {
+            cachedAt: getNow(),
+            payload: payload || {}
+        };
+
+        return cache[key].payload;
+    }
+
+    function getPendingRequests(scope) {
+        return $(scope).data('coveoPendingRequests') || {};
+    }
+
+    function setPendingRequests(scope, requests) {
+        $(scope).data('coveoPendingRequests', requests);
+    }
+
+    function abortPendingRequest(scope, requestName) {
+        var requests = getPendingRequests(scope);
+        var xhr = requests[requestName];
+
+        if (xhr && xhr.readyState !== 4 && xhr.abort) {
+            xhr.abort();
+        }
+
+        delete requests[requestName];
+        setPendingRequests(scope, requests);
+    }
+
+    function abortPendingRequests(scope, requestNames) {
+        requestNames.forEach(function (requestName) {
+            abortPendingRequest(scope, requestName);
+        });
+    }
+
+    function trackPendingRequest(scope, requestName, xhr) {
+        var requests = getPendingRequests(scope);
+
+        abortPendingRequest(scope, requestName);
+        requests = getPendingRequests(scope);
+        requests[requestName] = xhr;
+        setPendingRequests(scope, requests);
+
+        return xhr;
+    }
+
+    function releasePendingRequest(scope, requestName, xhr) {
+        var requests = getPendingRequests(scope);
+
+        if (requests[requestName] === xhr) {
+            delete requests[requestName];
+            setPendingRequests(scope, requests);
+        }
+    }
+
+    function clearTypedState(scope) {
+        $(scope).removeData('coveoTypedState');
+    }
+
+    function setTypedState(scope, state) {
+        $(scope).data('coveoTypedState', state);
+        return state;
+    }
+
+    function getTypedState(scope, requestId, query) {
+        var state = $(scope).data('coveoTypedState');
+
+        if (!state) {
+            return null;
+        }
+
+        if (String(state.requestId) !== String(requestId) || state.query !== query) {
+            return null;
+        }
+
+        return state;
+    }
+
+    function updateTypedState(scope, requestId, query, patch) {
+        var state = getTypedState(scope, requestId, query);
+
+        if (!state) {
+            return null;
+        }
+
+        Object.keys(patch || {}).forEach(function (key) {
+            state[key] = patch[key];
+        });
+
+        return setTypedState(scope, state);
+    }
+
+    function renderStoredTypedState(scope, requestId, query) {
+        var state = getTypedState(scope, requestId, query);
+
+        if (!state) {
+            return;
+        }
+
+        renderTypedState(scope, state.suggestions || [], state.products || []);
     }
 
     function getWrapper(scope) {
@@ -335,13 +471,32 @@
     }
 
     function callEndpoint(url, data, onSuccess, onError) {
-        $.ajax({
+        return $.ajax({
             url: url,
             method: 'GET',
             data: $.extend({}, data, getDebugParams()),
             success: onSuccess,
             error: onError || $.noop
         });
+    }
+
+    function requestEndpoint(scope, requestName, url, data, onSuccess, onError) {
+        var xhr = trackPendingRequest(scope, requestName, callEndpoint(url, data, function (payload) {
+            releasePendingRequest(scope, requestName, xhr);
+            onSuccess(payload || {});
+        }, function (jqXHR, textStatus) {
+            releasePendingRequest(scope, requestName, xhr);
+
+            if (textStatus === 'abort') {
+                return;
+            }
+
+            if (onError) {
+                onError(jqXHR, textStatus);
+            }
+        }));
+
+        return xhr;
     }
 
     function renderBootstrap(scope, payload) {
@@ -410,39 +565,72 @@
         return String($(scope).attr('data-coveo-request-id') || '') !== String(requestId);
     }
 
-    function loadPreview(scope, originalQuery, previewQuery, suggestions, requestId) {
+    function loadPreview(scope, originalQuery, previewQuery, requestId) {
         var $wrapper = getWrapper(scope);
-        var previewCache = $wrapper.data('coveoPreviewCache') || {};
         var previewUrl = readData($wrapper, 'previewUrl', '');
+        var cacheKey = buildCacheKey(previewUrl, previewQuery);
+        var cachedPayload = null;
 
         if (!previewQuery) {
-            renderTypedState(scope, suggestions, []);
+            updateTypedState(scope, requestId, originalQuery, {
+                previewQuery: '',
+                products: []
+            });
+            renderStoredTypedState(scope, requestId, originalQuery);
             return;
         }
 
-        if (previewCache[previewQuery]) {
-            renderTypedState(scope, suggestions, previewCache[previewQuery].products || []);
+        if (!updateTypedState(scope, requestId, originalQuery, {
+            previewQuery: previewQuery
+        })) {
             return;
         }
 
-        callEndpoint(previewUrl, {
+        cachedPayload = readCache(previewCache, cacheKey, PRODUCT_PREVIEW_CACHE_TTL);
+
+        if (cachedPayload) {
+            updateTypedState(scope, requestId, originalQuery, {
+                products: cachedPayload.products || []
+            });
+            renderStoredTypedState(scope, requestId, originalQuery);
+            return;
+        }
+
+        requestEndpoint(scope, REQUEST_TYPES.PREVIEW, previewUrl, {
             q: previewQuery
         }, function (payload) {
+            var state;
+
             if (isStaleRequest(scope, requestId) || normalizeString($(scope).val()) !== originalQuery) {
                 return;
             }
 
-            previewCache[previewQuery] = payload || {
-                products: []
-            };
-            $wrapper.data('coveoPreviewCache', previewCache);
-            renderTypedState(scope, suggestions, (payload && payload.products) || []);
+            state = getTypedState(scope, requestId, originalQuery);
+
+            if (!state || state.previewQuery !== previewQuery) {
+                return;
+            }
+
+            writeCache(previewCache, cacheKey, payload);
+            updateTypedState(scope, requestId, originalQuery, {
+                products: (payload && payload.products) || []
+            });
+            renderStoredTypedState(scope, requestId, originalQuery);
         }, function () {
+            var state = getTypedState(scope, requestId, originalQuery);
+
             if (isStaleRequest(scope, requestId)) {
                 return;
             }
 
-            renderTypedState(scope, suggestions, []);
+            if (!state || state.previewQuery !== previewQuery) {
+                return;
+            }
+
+            updateTypedState(scope, requestId, originalQuery, {
+                products: []
+            });
+            renderStoredTypedState(scope, requestId, originalQuery);
         });
     }
 
@@ -451,14 +639,21 @@
         var suggestUrl = readData($wrapper, 'suggestUrl', '');
         var query = normalizeString($(scope).val());
         var minChars = parseInt(readData($wrapper, 'minChars', 2), 10);
+        var cachedSuggestions;
+        var cacheKey;
         var requestId;
 
         if (!query.length) {
+            abortPendingRequests(scope, [REQUEST_TYPES.SUGGEST, REQUEST_TYPES.PREVIEW]);
             loadBootstrap(scope);
             return;
         }
 
+        abortPendingRequest(scope, REQUEST_TYPES.BOOTSTRAP);
+
         if (query.length < minChars) {
+            abortPendingRequests(scope, [REQUEST_TYPES.SUGGEST, REQUEST_TYPES.PREVIEW]);
+            clearTypedState(scope);
             $wrapper.empty().hide();
             setExpanded(scope, false);
             clearModals();
@@ -466,40 +661,70 @@
         }
 
         requestId = setActiveRequest(scope);
-
-        callEndpoint(suggestUrl, {
-            q: query
-        }, function (payload) {
-            var suggestions = (payload && payload.suggestions) || [];
-            var previewQuery = suggestions.length ? suggestions[0].value : query;
-
-            if (isStaleRequest(scope, requestId) || normalizeString($(scope).val()) !== query) {
-                return;
-            }
-
-            renderTypedState(scope, suggestions, []);
-            loadPreview(scope, query, previewQuery, suggestions, requestId);
-        }, function () {
-            if (isStaleRequest(scope, requestId)) {
-                return;
-            }
-
-            $wrapper.empty().hide();
-            setExpanded(scope, false);
-            clearModals();
+        setTypedState(scope, {
+            requestId: requestId,
+            query: query,
+            previewQuery: query,
+            suggestions: [],
+            products: []
         });
+        cacheKey = buildCacheKey(suggestUrl, query);
+        cachedSuggestions = readCache(suggestCache, cacheKey, QUERY_SUGGEST_CACHE_TTL);
+
+        if (cachedSuggestions) {
+            updateTypedState(scope, requestId, query, {
+                suggestions: (cachedSuggestions.suggestions) || []
+            });
+            renderStoredTypedState(scope, requestId, query);
+        } else {
+            requestEndpoint(scope, REQUEST_TYPES.SUGGEST, suggestUrl, {
+                q: query
+            }, function (payload) {
+                if (isStaleRequest(scope, requestId) || normalizeString($(scope).val()) !== query) {
+                    return;
+                }
+
+                writeCache(suggestCache, cacheKey, payload);
+                updateTypedState(scope, requestId, query, {
+                    suggestions: (payload && payload.suggestions) || []
+                });
+                renderStoredTypedState(scope, requestId, query);
+            }, function () {
+                if (isStaleRequest(scope, requestId)) {
+                    return;
+                }
+
+                updateTypedState(scope, requestId, query, {
+                    suggestions: []
+                });
+                renderStoredTypedState(scope, requestId, query);
+            });
+        }
+
+        loadPreview(scope, query, query, requestId);
     }
 
     function loadBootstrap(scope) {
         var $wrapper = getWrapper(scope);
         var bootstrapUrl = readData($wrapper, 'bootstrapUrl', '');
+        var cacheKey = buildCacheKey(bootstrapUrl, 'bootstrap');
+        var cachedPayload = readCache(bootstrapCache, cacheKey, BOOTSTRAP_CACHE_TTL);
         var requestId = setActiveRequest(scope);
 
-        callEndpoint(bootstrapUrl, {}, function (payload) {
+        clearTypedState(scope);
+        abortPendingRequests(scope, [REQUEST_TYPES.SUGGEST, REQUEST_TYPES.PREVIEW]);
+
+        if (cachedPayload) {
+            renderBootstrap(scope, cachedPayload);
+            return;
+        }
+
+        requestEndpoint(scope, REQUEST_TYPES.BOOTSTRAP, bootstrapUrl, {}, function (payload) {
             if (isStaleRequest(scope, requestId) || normalizeString($(scope).val()).length) {
                 return;
             }
 
+            writeCache(bootstrapCache, cacheKey, payload);
             renderBootstrap(scope, payload || {});
         }, function () {
             if (isStaleRequest(scope, requestId)) {
@@ -512,53 +737,96 @@
         });
     }
 
+    function stopLegacySearchHandlers(event) {
+        if (event.stopImmediatePropagation) {
+            event.stopImmediatePropagation();
+        }
+
+        if (event.stopPropagation) {
+            event.stopPropagation();
+        }
+    }
+
+    function getInputBindings(scope) {
+        return $(scope).data('coveoInputBindings') || null;
+    }
+
+    function setInputBindings(scope, bindings) {
+        $(scope).data('coveoInputBindings', bindings || null);
+    }
+
+    function removeInputBindings(scope) {
+        var bindings = getInputBindings(scope);
+
+        if (!bindings) {
+            return;
+        }
+
+        scope.removeEventListener('focus', bindings.focus, true);
+        scope.removeEventListener('keyup', bindings.keyup, true);
+        scope.removeEventListener('keydown', bindings.keydown, true);
+        setInputBindings(scope, null);
+    }
+
     function bindInput(scope) {
         var debouncedLoad = debounce(function () {
             loadTypedSuggestions(scope);
         }, DEBOUNCE_DELAY);
+        var bindings;
 
-        $(scope).off('keyup').off('focus');
+        removeInputBindings(scope);
+        $(scope).off('keyup').off('focus').off('keydown');
 
-        $(scope).on('focus.coveoSearchBox', function () {
-            if (!normalizeString($(this).val()).length) {
-                loadBootstrap(this);
-                return;
+        bindings = {
+            focus: function (event) {
+                stopLegacySearchHandlers(event);
+
+                if (!normalizeString($(scope).val()).length) {
+                    loadBootstrap(scope);
+                    return;
+                }
+
+                debouncedLoad();
+            },
+            keyup: function (event) {
+                stopLegacySearchHandlers(event);
+
+                switch (event.which || event.keyCode) {
+                    case DOWN_KEY:
+                        moveSelection(scope, 1);
+                        event.preventDefault();
+                        break;
+                    case UP_KEY:
+                        moveSelection(scope, -1);
+                        event.preventDefault();
+                        break;
+                    default:
+                        debouncedLoad();
+                }
+            },
+            keydown: function (event) {
+                var $selectedLink;
+
+                if ((event.which || event.keyCode) !== ENTER_KEY) {
+                    return;
+                }
+
+                stopLegacySearchHandlers(event);
+                $selectedLink = getWrapper(scope).find('.suggestions .item.selected a').first();
+
+                if (!$selectedLink.length) {
+                    return;
+                }
+
+                event.preventDefault();
+                $selectedLink[0].click();
             }
+        };
 
-            debouncedLoad.call(this);
-        });
-
-        $(scope).on('keyup.coveoSearchBox', function (event) {
-            switch (event.which) {
-                case DOWN_KEY:
-                    moveSelection(this, 1);
-                    event.preventDefault();
-                    break;
-                case UP_KEY:
-                    moveSelection(this, -1);
-                    event.preventDefault();
-                    break;
-                default:
-                    debouncedLoad.call(this);
-            }
-        });
-
-        $(scope).on('keydown.coveoSearchBox', function (event) {
-            var $selectedLink;
-
-            if (event.which !== ENTER_KEY) {
-                return;
-            }
-
-            $selectedLink = getWrapper(this).find('.suggestions .item.selected a').first();
-
-            if (!$selectedLink.length) {
-                return;
-            }
-
-            event.preventDefault();
-            $selectedLink[0].click();
-        });
+        scope.addEventListener('focus', bindings.focus, true);
+        scope.addEventListener('keyup', bindings.keyup, true);
+        scope.addEventListener('keydown', bindings.keydown, true);
+        setInputBindings(scope, bindings);
     }
 
     function bindDelegatedEvents() {
@@ -569,21 +837,13 @@
             var requestId = parseInt($(scope).attr('data-coveo-request-id') || '0', 10) || 0;
             var previewQuery = normalizeString($link.attr('data-preview-query'));
             var query = normalizeString($(scope).val());
-            var suggestions = [];
 
             $wrapper.find('.suggestions .item').removeClass('selected').removeAttr('aria-selected');
             $link.closest('.item').addClass('selected').attr('aria-selected', 'true');
             $(scope).attr('aria-activedescendant', $link.closest('.item').attr('id') || '');
 
-            $wrapper.find('.suggestions .item a[data-preview-query]').each(function () {
-                suggestions.push({
-                    value: normalizeString($(this).attr('data-search-query')),
-                    url: $(this).attr('href')
-                });
-            });
-
             if (previewQuery && query.length) {
-                loadPreview(scope, query, previewQuery, suggestions, requestId);
+                loadPreview(scope, query, previewQuery, requestId);
             }
         });
 
@@ -598,6 +858,8 @@
 
             event.preventDefault();
             $input.val('');
+            abortPendingRequests($input[0], [REQUEST_TYPES.BOOTSTRAP, REQUEST_TYPES.SUGGEST, REQUEST_TYPES.PREVIEW]);
+            clearTypedState($input[0]);
             $wrapper.empty().hide();
             setExpanded($input[0], false);
             clearModals();

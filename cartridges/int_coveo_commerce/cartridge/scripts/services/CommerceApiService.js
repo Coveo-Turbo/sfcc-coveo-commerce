@@ -108,7 +108,17 @@ function execute(operationName, endpointPath, payload, authContext, settings) {
 
 function normalizeSuggestions(response, analyticsContext) {
     var source = response || {};
-    var suggestions = source.suggestions || source.items || [];
+    var suggestions = source.completions || source.suggestions || source.items || [];
+
+    function normalizeSuggestionValue(item) {
+        var value = item.expression || item.highlighted || item.value || item.query || item.label || '';
+
+        return String(value)
+            .replace(/\[/g, '')
+            .replace(/\]/g, '')
+            .replace(/[{}()]/g, '')
+            .replace(/^\s+|\s+$/g, '');
+    }
 
     return {
         suggestions: suggestions.map(function (item) {
@@ -119,9 +129,11 @@ function normalizeSuggestions(response, analyticsContext) {
             }
 
             return {
-                value: item.value || item.query || item.label || '',
+                value: normalizeSuggestionValue(item),
                 raw: item
             };
+        }).filter(function (item) {
+            return !!item.value;
         }),
         responseId: source.responseId || '',
         queryUid: source.queryUid || '',
