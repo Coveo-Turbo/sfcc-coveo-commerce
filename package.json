@@ -9,9 +9,7 @@
     "test": "node test/run-tests.js",
     "upload": "sgmf-scripts --upload -- ",
     "packageMetadata": "mkdir -p dist && rm -rf dist/int_coveo_commerce_site_preferences dist/int_coveo_commerce_site_preferences.zip && mkdir -p dist/int_coveo_commerce_site_preferences && cp -R metadata/meta dist/int_coveo_commerce_site_preferences/meta && cd dist && zip -rq int_coveo_commerce_site_preferences.zip int_coveo_commerce_site_preferences && rm -rf int_coveo_commerce_site_preferences",
-    "uploadCartridge": "sgmf-scripts --uploadCartridge int_coveo_commerce",
-    "uploadMondouValidation": "sgmf-scripts --uploadCartridge int_coveo_commerce && sgmf-scripts --uploadCartridge app_mondou_coveo",
-    "uploadMondouOverlay": "sgmf-scripts --uploadCartridge app_mondou_coveo"
+    "uploadCartridge": "sgmf-scripts --uploadCartridge int_coveo_commerce"
   },
   "devDependencies": {
     "babel-eslint": "^7.2.3",

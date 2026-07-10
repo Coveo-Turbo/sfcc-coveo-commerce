@@ -1,7 +1,6 @@
 # Customization Guide
 
 The cartridge is designed to be overridden from a custom storefront cartridge placed earlier in the cartridge path.
-For Mondou, the current validation seam lives in `app_mondou_coveo/Search.js`, which adapts both `q` search requests and `cgid` category requests while leaving `int_coveo_commerce` reusable.
 
 ## Common Override Points
 
