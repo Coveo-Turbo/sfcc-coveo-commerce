@@ -18,6 +18,9 @@
             <meta name="x-coveo-commerce-flow" content="${pdict.coveoFlow}" />
             <meta name="x-coveo-commerce-source" content="${pdict.coveoFlowSource || 'app_mondou_coveo'}" />
         </isif>
+        <isif condition="${pdict.coveoDebugData}">
+            <script id="coveo-debug-data" type="application/json"><isprint value="${JSON.stringify(pdict.coveoDebugData)}" encoding="off" /></script>
+        </isif>
         <isactivedatahead/>
         <isinclude template="/components/schema" />
     </head>

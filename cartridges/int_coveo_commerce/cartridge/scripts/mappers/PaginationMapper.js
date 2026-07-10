@@ -13,10 +13,25 @@ function normalizeNumber(value, fallback) {
 function map(response, params) {
     var source = response || {};
     var requestParams = params || {};
-    var page = normalizeNumber(source.page || source.currentPage || requestParams.page, 0);
-    var perPage = normalizeNumber(source.perPage || source.pageSize || requestParams.perPage || requestParams.sz, 12);
-    var total = normalizeNumber(source.totalEntries || source.totalCount || source.total || source.totalResults, 0);
-    var totalPages = normalizeNumber(source.totalPages, 0);
+    var pagination = source.pagination || {};
+    var page = normalizeNumber(
+        pagination.page || source.page || source.currentPage || requestParams.page,
+        0
+    );
+    var perPage = normalizeNumber(
+        pagination.perPage || source.perPage || source.pageSize || requestParams.perPage || requestParams.sz,
+        12
+    );
+    var total = normalizeNumber(
+        pagination.totalProducts ||
+        pagination.totalEntries ||
+        source.totalEntries ||
+        source.totalCount ||
+        source.total ||
+        source.totalResults,
+        0
+    );
+    var totalPages = normalizeNumber(pagination.totalPages || source.totalPages, 0);
 
     if (!totalPages && perPage > 0) {
         totalPages = Math.ceil(total / perPage);

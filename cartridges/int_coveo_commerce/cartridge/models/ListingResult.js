@@ -13,6 +13,7 @@ function ListingResult(data) {
     this.queryUid = payload.queryUid || '';
     this.analytics = payload.analytics || {};
     this.raw = payload.raw || {};
+    this.debug = payload.debug || null;
 }
 
 ListingResult.prototype.toJSON = function () {

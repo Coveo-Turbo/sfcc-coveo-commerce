@@ -106,6 +106,158 @@ function execute(operationName, endpointPath, payload, authContext, settings) {
     });
 }
 
+function mapFacetSelections(values) {
+    return (values || []).map(function (value) {
+        if (typeof value === 'string') {
+            return value;
+        }
+
+        if (typeof value.value !== 'undefined') {
+            return String(value.value);
+        }
+
+        if (typeof value.start !== 'undefined' || typeof value.end !== 'undefined') {
+            return {
+                start: value.start,
+                end: value.end,
+                endInclusive: value.endInclusive !== false
+            };
+        }
+
+        return '';
+    }).filter(function (value) {
+        if (typeof value === 'string') {
+            return !!value;
+        }
+
+        return !!value;
+    });
+}
+
+function summarizeRequestFacets(facets) {
+    return (facets || []).map(function (facet) {
+        return {
+            facetId: facet.facetId || facet.field || '',
+            field: facet.field || '',
+            type: facet.type || '',
+            selectedValues: mapFacetSelections(facet.values)
+        };
+    });
+}
+
+function summarizeRequestContext(context) {
+    var source = context || {};
+    var view = source.view || {};
+    var cart = source.cart || [];
+    var user = source.user || {};
+
+    return {
+        viewUrl: view.url || '',
+        capture: source.capture === true,
+        cartSize: typeof cart.length === 'number' ? cart.length : 0,
+        hasUserAgent: !!user.userAgent,
+        hasReferrer: !!user.referrer
+    };
+}
+
+function summarizeResponseFacets(rawFacets) {
+    return (rawFacets || []).map(function (facet) {
+        var values = facet.values || facet.options || [];
+        var selectedValues = values.filter(function (value) {
+            var state = String(value && value.state ? value.state : '').toLowerCase();
+
+            return state === 'selected' || value.selected === true;
+        }).map(function (value) {
+            if (typeof value.displayValue !== 'undefined' && value.displayValue !== null && value.displayValue !== '') {
+                return String(value.displayValue);
+            }
+
+            if (typeof value.value !== 'undefined' && value.value !== null && value.value !== '') {
+                return String(value.value);
+            }
+
+            if (typeof value.name !== 'undefined' && value.name !== null && value.name !== '') {
+                return String(value.name);
+            }
+
+            return '';
+        }).filter(function (value) {
+            return !!value;
+        });
+
+        return {
+            facetId: facet.facetId || facet.id || facet.field || '',
+            field: facet.field || '',
+            label: facet.displayName || facet.label || '',
+            valuesCount: values.length,
+            selectedValues: selectedValues
+        };
+    });
+}
+
+function resolveDebugTotal(rawResponse, mappedResponse) {
+    var pagination = rawResponse && rawResponse.pagination ? rawResponse.pagination : {};
+
+    if (typeof pagination.totalEntries === 'number') {
+        return pagination.totalEntries;
+    }
+
+    if (typeof pagination.totalProducts === 'number') {
+        return pagination.totalProducts;
+    }
+
+    if (mappedResponse && mappedResponse.pagination && typeof mappedResponse.pagination.total === 'number') {
+        return mappedResponse.pagination.total;
+    }
+
+    if (typeof rawResponse.totalCount === 'number') {
+        return rawResponse.totalCount;
+    }
+
+    return null;
+}
+
+function buildDebugSnapshot(operationName, endpointPath, payload, response, mappedResponse) {
+    var rawResponse = response && response.data ? response.data : {};
+    var rawFacets = rawResponse.facets || rawResponse.filters || [];
+
+    return {
+        operation: operationName,
+        endpoint: endpointPath,
+        request: {
+            trackingId: payload.trackingId || '',
+            clientId: payload.clientId || '',
+            language: payload.language || '',
+            country: payload.country || '',
+            currency: payload.currency || '',
+            query: payload.query || '',
+            categoryId: payload.categoryId || '',
+            productId: payload.productId || '',
+            slotId: payload.slotId || '',
+            page: typeof payload.page === 'number' ? payload.page : null,
+            perPage: typeof payload.perPage === 'number' ? payload.perPage : null,
+            count: typeof payload.count === 'number' ? payload.count : null,
+            sort: payload.sort || null,
+            facets: summarizeRequestFacets(payload.facets),
+            context: summarizeRequestContext(payload.context)
+        },
+        rawRequest: payload,
+        response: {
+            statusCode: response && typeof response.statusCode === 'number' ? response.statusCode : null,
+            duration: response && typeof response.duration === 'number' ? response.duration : null,
+            responseId: mappedResponse && mappedResponse.responseId ? mappedResponse.responseId : (rawResponse.responseId || ''),
+            queryUid: mappedResponse && mappedResponse.queryUid ? mappedResponse.queryUid : (rawResponse.queryUid || ''),
+            total: resolveDebugTotal(rawResponse, mappedResponse),
+            productCount: mappedResponse && mappedResponse.products ? mappedResponse.products.length : 0,
+            recommendationCount: mappedResponse && mappedResponse.recommendations ? mappedResponse.recommendations.length : 0,
+            suggestionCount: rawResponse && rawResponse.completions ? rawResponse.completions.length : ((rawResponse.suggestions || rawResponse.items || []).length || 0),
+            facetCount: rawFacets.length,
+            facets: summarizeResponseFacets(rawFacets)
+        },
+        rawResponse: rawResponse
+    };
+}
+
 function normalizeSuggestions(response, analyticsContext) {
     var source = response || {};
     var suggestions = source.completions || source.suggestions || source.items || [];
@@ -161,6 +313,9 @@ function search(params) {
     validatePayload('search', payload);
     response = execute('search', ENDPOINTS.SEARCH, payload, requestParams, settings);
     mapped = SearchResultMapper.map(response.data, requestParams, analyticsContext);
+    if (requestParams.coveoDebug) {
+        mapped.debug = buildDebugSnapshot('search', ENDPOINTS.SEARCH, payload, response, mapped);
+    }
 
     Logger.debug('Mapped Coveo search response.', {
         query: payload.query,
@@ -184,6 +339,9 @@ function listing(params) {
     validatePayload('listing', payload);
     response = execute('listing', ENDPOINTS.LISTING, payload, requestParams, settings);
     mapped = ListingResultMapper.map(response.data, requestParams, analyticsContext);
+    if (requestParams.coveoDebug) {
+        mapped.debug = buildDebugSnapshot('listing', ENDPOINTS.LISTING, payload, response, mapped);
+    }
 
     Logger.debug('Mapped Coveo listing response.', {
         categoryId: payload.categoryId,
@@ -239,6 +397,9 @@ function recommendations(params) {
     validatePayload('recommendations', payload);
     response = execute('recommendations', ENDPOINTS.RECOMMENDATIONS, payload, requestParams, settings);
     mapped = RecommendationMapper.map(response.data, requestParams, analyticsContext);
+    if (requestParams.coveoDebug) {
+        mapped.debug = buildDebugSnapshot('recommendations', ENDPOINTS.RECOMMENDATIONS, payload, response, mapped);
+    }
 
     return new RecommendationResult(mapped);
 }

@@ -301,6 +301,7 @@ function buildSearchPayload(params, config, analyticsContext) {
 function buildListingPayload(params, config, analyticsContext) {
     var commerceContext = buildCommerceContext(params, config);
     var payload = {
+        categoryId: params.categoryId || params.cgid || '',
         trackingId: params.trackingId || config.trackingId,
         clientId: analyticsContext.clientId,
         language: commerceContext.language,

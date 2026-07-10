@@ -173,8 +173,9 @@ In the current Mondou storefront, that means keeping `int_coveo_commerce` after 
 
 Current Mondou starter scope:
 
-- query search pages only
+- query search pages
+- category listing pages through Mondou's existing `Search.js` route chain
 - sort and filter AJAX flows
 - header search box focus and typing states through `SearchBox-Bootstrap`, `SearchBox-Suggest`, and `SearchBox-Preview`
-- native category flows still handled by Mondou’s existing implementation
+- GTM/dataLayer response metadata for search, listing, suggest, productSuggest, and recommendation flows
 - intended to be extracted into a separate Mondou delivery repo once the integration shape is validated

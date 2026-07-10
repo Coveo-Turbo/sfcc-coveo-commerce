@@ -4,6 +4,10 @@
     <isinclude template="reporting/reportingUrls" />
 </isif>
 
+<isif condition="${pdict.coveoDebugData}">
+    <script class="js-coveo-debug-data" type="application/json"><isprint value="${JSON.stringify(pdict.coveoDebugData)}" encoding="off" /></script>
+</isif>
+
 <div class="product-list-page">
     <div class="plp-header" style="
             background-color: ${pdict.topBannerBackgroundColor ? pdict.topBannerBackgroundColor : '#fff'};

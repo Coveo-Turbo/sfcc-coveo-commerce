@@ -62,11 +62,12 @@ Its purpose is to show the refactoring seam between Mondou storefront code and `
 
 Current starter scope:
 
-- query search only
-- sort and refinement flows backed by `CommerceApiService.search()`
+- query search backed by `CommerceApiService.search()`
+- category listing backed by `CommerceApiService.listing()` through Mondou's existing `Search.js` route chain
+- sort and refinement flows for both search and category pages
 - header search box backed by `SearchBox-Bootstrap`, `SearchBox-Suggest`, and `SearchBox-Preview`
 - minimal template overrides to remove native `ProductSearchModel` assumptions
-- native category handling preserved for now
+- GTM/dataLayer response metadata surfaced for full-page and JSON Coveo flows
 
 This gives the Mondou team a safe incremental path:
 
@@ -78,10 +79,9 @@ Search request with q
 
 Category request with cgid
     -> app_mondou_coveo/Search.js
-    -> native Mondou search flow
+    -> int_coveo_commerce/CommerceApiService.listing()
+    -> Coveo Commerce API
 ```
-
-Later phases can move category pages, query suggest, and deeper analytics behavior into the overlay once the search-only path is validated.
 
 Once that shape is stable, `app_mondou_coveo` should be extracted from this repo and delivered through a Mondou-specific source boundary.
 
@@ -96,6 +96,23 @@ The Mondou validation overlay supports an opt-in query parameter for server-side
 When `coveoDebug=1` is present on search, sort, or refinement requests, the integration writes a sanitized request and response summary as warning-level custom log entries.
 In this cartridge, those entries are written to the `custom-CoveoCommerce-<instance>-<date>.log` file family.
 This debug mode is intended for validation only and does not expose authorization headers, bearer tokens, or search tokens.
+
+For full-page search and listing renders, the overlay also injects a sanitized JSON block into the page source:
+
+```html
+<script id="coveo-debug-data" type="application/json">...</script>
+```
+
+This payload is intended to make troubleshooting easier in environments where Coveo requests are server-side. It includes the effective request type, normalized storefront refinements, the final Commerce payload shape, and a condensed raw response summary with facet ids, fields, selected values, `responseId`, and `queryUid`.
+
+For validation, the Mondou overlay also supports an opt-in flow toggle:
+
+```text
+?coveoFlow=native
+?coveoFlow=coveo
+```
+
+Use `coveoFlow=native` to force Mondou's native search/category behavior, or `coveoFlow=coveo` to force the overlay path when the route is otherwise eligible.
 
 ## Companion Repository
 

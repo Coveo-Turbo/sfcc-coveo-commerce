@@ -8,6 +8,7 @@ function RecommendationResult(data) {
     this.responseId = payload.responseId || '';
     this.analytics = payload.analytics || {};
     this.raw = payload.raw || {};
+    this.debug = payload.debug || null;
 }
 
 RecommendationResult.prototype.toJSON = function () {

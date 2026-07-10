@@ -18,6 +18,12 @@ var HEADER_REFINEMENTS = {
     brand: true,
     recurrence: true
 };
+var STOREFRONT_REFINEMENT_ALIASES = {
+    brand: 'brand',
+    ec_brand: 'brand',
+    recurrence: 'recurrence',
+    ec_subscription_eligible: 'recurrence'
+};
 
 function getHttpRequest() {
     if (typeof request !== 'undefined') {
@@ -304,6 +310,215 @@ function normalizeQueryValue(value) {
     return '';
 }
 
+function getHttpParameterValue(httpParameterMap, key) {
+    var param = httpParameterMap && httpParameterMap[key];
+
+    if (!param) {
+        return '';
+    }
+
+    if (typeof param.stringValue !== 'undefined' && param.stringValue !== null && param.stringValue !== '') {
+        return String(param.stringValue);
+    }
+
+    if (typeof param.value !== 'undefined' && param.value !== null && param.value !== '') {
+        return String(param.value);
+    }
+
+    return '';
+}
+
+function getSessionFlowOverride(req) {
+    var privacy = req && req.session ? req.session.privacyCache || req.session.privacy : null;
+    var flow = privacy && privacy.coveoFlowOverride ? String(privacy.coveoFlowOverride).toLowerCase() : '';
+
+    if (flow === 'native' || flow === 'coveo') {
+        return flow;
+    }
+
+    return '';
+}
+
+function setSessionFlowOverride(req, flow) {
+    var normalized = String(flow || '').toLowerCase();
+    var privacy;
+
+    if (normalized !== 'native' && normalized !== 'coveo') {
+        return;
+    }
+
+    if (!req || !req.session) {
+        return;
+    }
+
+    privacy = req.session.privacyCache || req.session.privacy;
+
+    if (privacy) {
+        privacy.coveoFlowOverride = normalized;
+    }
+}
+
+function getFlowFromReferer(req) {
+    var referer = req && req.httpReferer ? String(req.httpReferer) : '';
+    var match;
+
+    if (!referer) {
+        return '';
+    }
+
+    match = referer.match(/[?&]coveoFlow=([^&#]+)/i);
+
+    if (!match || !match[1]) {
+        return '';
+    }
+
+    match = safeDecode(match[1]).toLowerCase();
+
+    if (match === 'native' || match === 'coveo') {
+        return match;
+    }
+
+    return '';
+}
+
+function isRequestDebugEnabled(req) {
+    var source = req && req.querystring ? req.querystring : {};
+    var directValue = source && source.coveoDebug;
+    var httpValue = getHttpParameterValue(req && req.httpParameterMap ? req.httpParameterMap : null, 'coveoDebug');
+
+    return normalizeBoolean(directValue) || normalizeBoolean(httpValue);
+}
+
+function parseSeoParams(httpParameterMap) {
+    var rawParams = getHttpParameterValue(httpParameterMap, 'params');
+    var parsedOuter;
+    var customPayload;
+    var parsedInner;
+    var result = {};
+    var queryString;
+
+    if (!rawParams) {
+        return result;
+    }
+
+    try {
+        parsedOuter = JSON.parse(rawParams);
+        customPayload = parsedOuter && parsedOuter.custom ? parsedOuter.custom : '';
+        parsedInner = customPayload ? JSON.parse(customPayload) : {};
+        queryString = parsedInner && parsedInner.queryString ? String(parsedInner.queryString) : '';
+    } catch (error) {
+        return result;
+    }
+
+    if (!queryString) {
+        return result;
+    }
+
+    queryString.split('&').forEach(function (pair) {
+        var parts;
+        var key;
+        var value;
+
+        if (!pair) {
+            return;
+        }
+
+        parts = pair.split('=');
+        key = safeDecode(parts[0] || '');
+        value = safeDecode(parts.slice(1).join('=') || '');
+
+        if (!key) {
+            return;
+        }
+
+        result[key] = value;
+    });
+
+    return result;
+}
+
+function buildRequestQuery(req) {
+    var source = req && req.querystring ? req.querystring : {};
+    var query = {};
+    var httpParameterMap = req && req.httpParameterMap ? req.httpParameterMap : null;
+    var seoParams = parseSeoParams(httpParameterMap);
+    var cgid = getHttpParameterValue(httpParameterMap, 'cgid');
+    var queryValue = getHttpParameterValue(httpParameterMap, 'q');
+    var explicitFlow;
+    var inheritedFlow;
+
+    Object.keys(source).forEach(function (key) {
+        query[key] = source[key];
+    });
+
+    Object.keys(seoParams).forEach(function (key) {
+        if (typeof query[key] === 'undefined' || query[key] === null || query[key] === '') {
+            query[key] = seoParams[key];
+        }
+    });
+
+    if (cgid && !query.cgid) {
+        query.cgid = cgid;
+    }
+
+    if (queryValue && !query.q) {
+        query.q = queryValue;
+    }
+
+    explicitFlow = String(query && query.coveoFlow ? query.coveoFlow : '').toLowerCase();
+
+    if (explicitFlow !== 'native' && explicitFlow !== 'coveo') {
+        explicitFlow = '';
+    }
+
+    if (explicitFlow) {
+        setSessionFlowOverride(req, explicitFlow);
+        return query;
+    }
+
+    inheritedFlow = getSessionFlowOverride(req) || getFlowFromReferer(req);
+
+    if (inheritedFlow && !query.coveoFlow) {
+        query.coveoFlow = inheritedFlow;
+    }
+
+    return query;
+}
+
+function normalizeListingViewUrl(url) {
+    return String(url || '')
+        .replace(/^\/s\/[^/]+/, '')
+        .replace(/\/+$/, '');
+}
+
+function getRequestedFlow(querystring) {
+    var flow = String(querystring && querystring.coveoFlow ? querystring.coveoFlow : '').toLowerCase();
+
+    if (flow === 'native' || flow === 'coveo') {
+        return flow;
+    }
+
+    return '';
+}
+
+function buildRequestDebugContext(req) {
+    var httpParameterMap = req && req.httpParameterMap ? req.httpParameterMap : null;
+    var normalizedQuery = buildRequestQuery(req);
+    var paramsPayload = getHttpParameterValue(httpParameterMap, 'params');
+
+    return {
+        querystringCgid: req && req.querystring ? req.querystring.cgid || '' : '',
+        querystringQ: req && req.querystring ? req.querystring.q || '' : '',
+        httpParameterMapCgid: getHttpParameterValue(httpParameterMap, 'cgid'),
+        httpParameterMapQ: getHttpParameterValue(httpParameterMap, 'q'),
+        httpParameterMapParams: paramsPayload ? String(paramsPayload).slice(0, 500) : '',
+        normalizedCgid: normalizedQuery.cgid || '',
+        normalizedQ: normalizedQuery.q || '',
+        normalizedPrefn1: normalizedQuery.prefn1 || '',
+        normalizedPrefv1: normalizedQuery.prefv1 || ''
+    };
+}
+
 function cloneQuery(querystring) {
     var source = querystring || {};
     var target = {};
@@ -321,7 +536,18 @@ function cloneQuery(querystring) {
 }
 
 function isCoveoSearchRequest(querystring) {
-    return !!(querystring && querystring.q && !querystring.cgid);
+    var effectiveQuery = querystring && querystring.querystring ? buildRequestQuery(querystring) : (querystring || {});
+    var requestedFlow = getRequestedFlow(effectiveQuery);
+
+    if (requestedFlow === 'native') {
+        return false;
+    }
+
+    if (requestedFlow === 'coveo') {
+        return !!(effectiveQuery && (effectiveQuery.q || effectiveQuery.cgid));
+    }
+
+    return !!(effectiveQuery && (effectiveQuery.q || effectiveQuery.cgid));
 }
 
 function isCoveoDebugRequest(querystring) {
@@ -596,11 +822,66 @@ function buildRefineUrl(querystring) {
     return buildRouteUrl('Search-Refinebar', buildBaseQuery(querystring));
 }
 
+function isCategoryRequest(querystring) {
+    return !!(querystring && querystring.cgid && !querystring.q);
+}
+
+function getCategory(querystring) {
+    var categoryId = querystring && querystring.cgid ? String(querystring.cgid) : '';
+    var CatalogMgr;
+
+    if (!categoryId) {
+        return null;
+    }
+
+    CatalogMgr = require('dw/catalog/CatalogMgr');
+
+    return CatalogMgr.getCategory(categoryId);
+}
+
+function mapCategory(category) {
+    var displayName;
+
+    if (!category) {
+        return null;
+    }
+
+    displayName = category.displayName || (category.getDisplayName ? category.getDisplayName() : '') || category.ID;
+
+    return {
+        name: displayName,
+        id: category.ID,
+        pageTitle: category.pageTitle || '',
+        description: category.description || '',
+        pageDescription: category.pageDescription || '',
+        pageKeywords: category.pageKeywords || ''
+    };
+}
+
 function isPriceFacet(facet) {
     var facetId = String((facet && facet.id) || '').toLowerCase();
     var facetType = String((facet && facet.type) || '').toLowerCase();
 
     return facetType === 'price' || /price|prix/.test(facetId);
+}
+
+function isCategoryFacet(refinement, rawRefinement) {
+    var candidates = [
+        refinement && refinement.id,
+        rawRefinement && rawRefinement.facetId,
+        rawRefinement && rawRefinement.field,
+        rawRefinement && rawRefinement.type
+    ];
+
+    return candidates.some(function (candidate) {
+        var normalized = String(candidate || '').toLowerCase();
+
+        return normalized === 'category' ||
+            normalized === 'categories' ||
+            normalized === 'ec_category' ||
+            normalized === 'hierarchicalcategory' ||
+            normalized === 'hierarchical';
+    });
 }
 
 function getValueType(attributeId) {
@@ -637,6 +918,27 @@ function resolveFacetRequestId(refinement, rawRefinement) {
     var source = rawRefinement || {};
 
     return String(source.field || source.facetId || refinement.id || '');
+}
+
+function resolveRefinementAttributeId(refinement, rawRefinement) {
+    var source = rawRefinement || {};
+    var candidates = [
+        source.facetId,
+        refinement.id,
+        source.field
+    ];
+    var index;
+    var normalized;
+
+    for (index = 0; index < candidates.length; index += 1) {
+        normalized = String(candidates[index] || '').toLowerCase();
+
+        if (STOREFRONT_REFINEMENT_ALIASES[normalized]) {
+            return STOREFRONT_REFINEMENT_ALIASES[normalized];
+        }
+    }
+
+    return String(source.facetId || refinement.id || source.field || '');
 }
 
 function resolveFacetValueId(value, rawValue, refinement) {
@@ -703,6 +1005,98 @@ function mapRefinementValues(refinement, rawRefinement, querystring, visibleCoun
     });
 }
 
+function buildCategoryValueNode(rawValue, mappedValue, querystring, facetRequestId, visibleCount) {
+    var path = rawValue && rawValue.path && typeof rawValue.path.length === 'number' ? rawValue.path : [];
+    var fallbackLabel = mappedValue && (mappedValue.label || mappedValue.id) ? (mappedValue.label || mappedValue.id) : '';
+    var leafLabel = path.length ? String(path[path.length - 1]) : fallbackLabel;
+    var valueId = resolveFacetValueId(mappedValue || {}, rawValue || {}, { type: 'hierarchical' });
+
+    return {
+        id: valueId,
+        type: 'category',
+        displayValue: leafLabel,
+        selected: mappedValue && mappedValue.selected === true,
+        selectable: true,
+        title: leafLabel,
+        url: buildFacetToggleUrl(querystring, facetRequestId, valueId, visibleCount),
+        subCategories: []
+    };
+}
+
+function mapCategoryRefinementValues(refinement, rawRefinement, querystring, visibleCount) {
+    var facetRequestId = resolveFacetRequestId(refinement, rawRefinement);
+    var rawValues = getRawRefinementValues(rawRefinement);
+    var roots = [];
+    var nodesByPath = {};
+
+    function ensurePathNode(labelPath, mappedValue, rawValue) {
+        var parentPath = [];
+        var currentNode = null;
+
+        labelPath.forEach(function (segment, index) {
+            var currentPath = labelPath.slice(0, index + 1);
+            var pathKey = currentPath.join('|');
+            var parentKey = parentPath.join('|');
+            var parentNode = parentKey ? nodesByPath[parentKey] : null;
+
+            if (!nodesByPath[pathKey]) {
+                nodesByPath[pathKey] = {
+                    id: index === labelPath.length - 1 ? resolveFacetValueId(mappedValue || {}, rawValue || {}, { type: 'hierarchical' }) : pathKey,
+                    type: 'category',
+                    displayValue: segment,
+                    selected: index === labelPath.length - 1 && mappedValue && mappedValue.selected === true,
+                    selectable: true,
+                    title: segment,
+                    url: index === labelPath.length - 1 ?
+                        buildFacetToggleUrl(querystring, facetRequestId, resolveFacetValueId(mappedValue || {}, rawValue || {}, { type: 'hierarchical' }), visibleCount) :
+                        '#',
+                    subCategories: []
+                };
+
+                if (parentNode) {
+                    parentNode.subCategories.push(nodesByPath[pathKey]);
+                } else {
+                    roots.push(nodesByPath[pathKey]);
+                }
+            } else if (index === labelPath.length - 1) {
+                nodesByPath[pathKey].selected = mappedValue && mappedValue.selected === true;
+                nodesByPath[pathKey].url = buildFacetToggleUrl(
+                    querystring,
+                    facetRequestId,
+                    resolveFacetValueId(mappedValue || {}, rawValue || {}, { type: 'hierarchical' }),
+                    visibleCount
+                );
+                nodesByPath[pathKey].id = resolveFacetValueId(mappedValue || {}, rawValue || {}, { type: 'hierarchical' });
+            }
+
+            currentNode = nodesByPath[pathKey];
+            parentPath = currentPath;
+        });
+
+        return currentNode;
+    }
+
+    if (!rawValues.length) {
+        return (refinement.values || []).map(function (mappedValue) {
+            return buildCategoryValueNode(null, mappedValue, querystring, facetRequestId, visibleCount);
+        });
+    }
+
+    rawValues.forEach(function (rawValue, index) {
+        var mappedValue = (refinement.values || [])[index] || {};
+        var path = rawValue && rawValue.path && typeof rawValue.path.length === 'number' ? rawValue.path : null;
+
+        if (path && path.length) {
+            ensurePathNode(path.map(String), mappedValue, rawValue);
+            return;
+        }
+
+        roots.push(buildCategoryValueNode(rawValue, mappedValue, querystring, facetRequestId, visibleCount));
+    });
+
+    return roots;
+}
+
 function mapRefinements(searchResult, querystring, visibleCount) {
     var openRefinements = getListPreference('openRefinements');
     var hiddenRefinements = getListPreference('notVisibleRefinements');
@@ -710,19 +1104,23 @@ function mapRefinements(searchResult, querystring, visibleCount) {
 
     return (searchResult.facets || []).map(function (refinement, index) {
         var rawRefinement = rawFacets[index] || {};
-        var values = mapRefinementValues(refinement, rawRefinement, querystring, visibleCount);
+        var attributeId = resolveRefinementAttributeId(refinement, rawRefinement);
+        var categoryRefinement = isCategoryFacet(refinement, rawRefinement);
+        var values = categoryRefinement ?
+            mapCategoryRefinementValues(refinement, rawRefinement, querystring, visibleCount) :
+            mapRefinementValues(refinement, rawRefinement, querystring, visibleCount);
         var priceRefinement = isPriceFacet(refinement);
 
         return {
-            attributeID: refinement.id,
+            attributeID: attributeId,
             displayName: refinement.label,
-            isCategoryRefinement: false,
-            isAttributeRefinement: !priceRefinement,
+            isCategoryRefinement: categoryRefinement,
+            isAttributeRefinement: !priceRefinement && !categoryRefinement,
             isPriceRefinement: priceRefinement,
             isPromotionRefinement: false,
             values: values,
-            showOpen: openRefinements.indexOf(refinement.id) >= 0,
-            display: hiddenRefinements.indexOf(refinement.id) < 0,
+            showOpen: openRefinements.indexOf(attributeId) >= 0 || openRefinements.indexOf(refinement.id) >= 0,
+            display: hiddenRefinements.indexOf(attributeId) < 0 && hiddenRefinements.indexOf(refinement.id) < 0,
             cutoffThreshold: rawRefinement.cutoffThreshold || values.length
         };
     });
@@ -808,20 +1206,26 @@ function buildProductSearch(searchResult, querystring) {
     var totalCount = searchResult.pagination && searchResult.pagination.total ? searchResult.pagination.total : returnedCount;
     var visibleCount = getVisibleCount(querystring, returnedCount);
     var refinements = mapRefinements(searchResult, querystring, visibleCount);
+    var categoryRequest = isCategoryRequest(querystring);
+    var category = categoryRequest ? mapCategory(getCategory(querystring)) : null;
 
     return {
         pageSize: getPageSize(querystring),
         pageNumber: getPageNumber(querystring),
         count: totalCount,
-        isCategorySearch: false,
-        isRefinedCategorySearch: false,
+        isCategorySearch: categoryRequest,
+        isRefinedCategorySearch: categoryRequest && refinements.some(function (refinement) {
+            return refinement.values.some(function (value) {
+                return value.selected;
+            });
+        }),
         searchKeywords: querystring.q || '',
         resetLink: buildResetLink(querystring),
         productIds: products,
         productSort: buildSortOptions(searchResult, querystring, visibleCount),
         showMoreUrl: buildShowMoreUrl(querystring, totalCount),
         permalink: buildPermalink(querystring, visibleCount),
-        category: null,
+        category: category,
         pageMetaTags: [],
         isSearchSuggestionsAvailable: false,
         suggestionPhrases: [],
@@ -833,11 +1237,12 @@ function buildProductSearch(searchResult, querystring) {
 }
 
 function buildSearchParams(req) {
-    var rawQuery = req.querystring || {};
+    var rawQuery = buildRequestQuery(req);
     var query = cloneQuery(rawQuery);
-    var params = cloneQuery(req.querystring);
+    var params = cloneQuery(rawQuery);
 
     params.query = query.q || '';
+    params.categoryId = query.cgid || '';
     params.page = getPageIndex(query);
     params.perPage = getPageSize(query);
     params.sort = parseJson(query.coveosort, query.sort || '');
@@ -848,29 +1253,110 @@ function buildSearchParams(req) {
     params.request = getHttpRequest();
     params.response = getHttpResponse();
 
+    if (params.categoryId) {
+        params.currentUrl = normalizeListingViewUrl(URLUtils.url('Search-Show', 'cgid', params.categoryId).toString());
+    }
+
     return params;
 }
 
-function search(req) {
+function buildCategoryViewData(category) {
+    if (!category) {
+        return {
+            category: null,
+            apiProductSearch: null
+        };
+    }
+
+    return {
+        category: mapCategory(category),
+        apiProductSearch: {
+            category: category
+        }
+    };
+}
+
+function summarizeStorefrontRefinements(refinements) {
+    return (refinements || []).map(function (refinement) {
+        return {
+            attributeID: refinement.attributeID || '',
+            displayName: refinement.displayName || '',
+            valuesCount: refinement.values ? refinement.values.length : 0,
+            selectedValues: (refinement.values || []).filter(function (value) {
+                return value.selected === true;
+            }).map(function (value) {
+                return value.displayValue || value.id || '';
+            }).filter(function (value) {
+                return !!value;
+            })
+        };
+    });
+}
+
+function buildDebugData(params, querystring, result, productSearch) {
+    return {
+        flow: 'mondou-overlay',
+        requestType: productSearch && productSearch.isCategorySearch ? 'listing' : 'search',
+        routeQuery: {
+            q: querystring.q || '',
+            cgid: querystring.cgid || '',
+            page: typeof params.page === 'number' ? params.page : null,
+            perPage: typeof params.perPage === 'number' ? params.perPage : null,
+            sortId: params.sortId || ''
+        },
+        storefront: {
+            resultCount: typeof productSearch.count === 'number' ? productSearch.count : null,
+            selectedFilters: productSearch.selectedFilters || [],
+            headerRefinementIds: productSearch.refinements.filter(function (refinement) {
+                return HEADER_REFINEMENTS[refinement.attributeID] === true;
+            }).map(function (refinement) {
+                return refinement.attributeID;
+            }),
+            refinements: summarizeStorefrontRefinements(productSearch.refinements)
+        },
+        commerce: result && result.debug ? result.debug : null
+    };
+}
+
+function resolveResultDataLayer(result, params, querystring) {
+    if (isCategoryRequest(querystring)) {
+        return GtmHelper.buildListingResponseEvent(result, {
+            categoryId: params.categoryId || params.cgid || '',
+            searchHub: result.analytics.searchHub,
+            pipeline: result.analytics.pipeline
+        });
+    }
+
+    return GtmHelper.buildSearchResponseEvent(result, {
+        query: params.query,
+        searchHub: result.analytics.searchHub,
+        pipeline: result.analytics.pipeline
+    });
+}
+
+function execute(req) {
     var params = buildSearchParams(req);
-    var searchResult = CommerceApiService.search(params);
-    var productSearch = buildProductSearch(searchResult, req.querystring || {});
+    var querystring = buildRequestQuery(req);
+    var category = getCategory(querystring);
+    var result = isCategoryRequest(querystring) ? CommerceApiService.listing(params) : CommerceApiService.search(params);
+    var productSearch = buildProductSearch(result, querystring);
+    var categoryViewData = buildCategoryViewData(category);
 
     Logger.debug('Mapped Mondou Coveo search response.', {
         query: params.query,
-        responseId: searchResult.responseId
+        categoryId: params.categoryId || '',
+        responseId: result.responseId
     });
 
     return {
         productSearch: productSearch,
-        refineurl: buildRefineUrl(req.querystring),
-        coveoSearch: searchResult,
-        coveoAnalytics: searchResult.analytics,
-        coveoDataLayer: GtmHelper.buildSearchResponseEvent(searchResult, {
-            query: params.query,
-            searchHub: searchResult.analytics.searchHub,
-            pipeline: searchResult.analytics.pipeline
-        }),
+        refineurl: buildRefineUrl(querystring),
+        coveoSearch: result,
+        coveoAnalytics: result.analytics,
+        coveoDataLayer: resolveResultDataLayer(result, params, querystring),
+        coveoDebugData: params.coveoDebug ? buildDebugData(params, querystring, result, productSearch) : null,
+        category: categoryViewData.category,
+        apiProductSearch: categoryViewData.apiProductSearch,
         headerRefinements: productSearch.refinements.filter(function (refinement) {
             return HEADER_REFINEMENTS[refinement.attributeID] === true;
         })
@@ -878,6 +1364,12 @@ function search(req) {
 }
 
 module.exports = {
+    buildRequestQuery: buildRequestQuery,
+    buildRequestDebugContext: buildRequestDebugContext,
+    getRequestedFlow: getRequestedFlow,
+    isRequestDebugEnabled: isRequestDebugEnabled,
+    normalizeListingViewUrl: normalizeListingViewUrl,
     isCoveoSearchRequest: isCoveoSearchRequest,
-    search: search
+    execute: execute,
+    search: execute
 };

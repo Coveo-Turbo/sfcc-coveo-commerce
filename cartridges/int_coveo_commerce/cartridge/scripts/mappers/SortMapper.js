@@ -51,8 +51,9 @@ function mapOption(option, selected) {
 function map(response, params) {
     var source = response || {};
     var requestParams = params || {};
-    var options = source.availableSorts || source.sortOptions || source.sorting || [];
-    var selected = buildId(source.appliedSort || {}) || requestParams.sortId || requestParams.sort || '';
+    var sort = source.sort || {};
+    var options = sort.availableSorts || source.availableSorts || source.sortOptions || source.sorting || [];
+    var selected = buildId(sort.appliedSort || source.appliedSort || {}) || requestParams.sortId || requestParams.sort || '';
 
     return {
         selected: selected,
