@@ -276,6 +276,160 @@ test('SearchTokenService caches search tokens per session context', function () 
     assert.strictEqual(sendCount, 1);
 });
 
+test('GtmHelper builds query and product suggestion events with response metadata', function () {
+    var GtmHelper = require(path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/helpers/GtmHelper.js'));
+    var querySuggestEvent = GtmHelper.buildQuerySuggestResponseEvent({
+        responseId: 'query-response-id',
+        queryUid: 'query-uid',
+        analytics: {
+            clientId: 'client-1',
+            searchHub: 'mondou_storefront',
+            pipeline: 'mondou-search'
+        }
+    }, {
+        query: 'chien',
+        surface: 'mondouSearchBoxSuggest',
+        source: 'app_mondou_coveo'
+    });
+    var productSuggestEvent = GtmHelper.buildProductSuggestResponseEvent({
+        responseId: 'product-response-id',
+        queryUid: 'product-query-uid',
+        analytics: {
+            clientId: 'client-1',
+            searchHub: 'mondou_storefront',
+            pipeline: 'mondou-search'
+        }
+    }, {
+        query: 'chien',
+        surface: 'mondouSearchBoxPreview',
+        source: 'app_mondou_coveo'
+    });
+
+    assert.strictEqual(querySuggestEvent.event, 'coveoQuerySuggestResponse');
+    assert.strictEqual(querySuggestEvent.operation, 'querySuggest');
+    assert.strictEqual(querySuggestEvent.responseId, 'query-response-id');
+    assert.strictEqual(querySuggestEvent.searchQueryUid, 'query-uid');
+    assert.strictEqual(querySuggestEvent.surface, 'mondouSearchBoxSuggest');
+    assert.strictEqual(productSuggestEvent.event, 'coveoProductSuggestResponse');
+    assert.strictEqual(productSuggestEvent.operation, 'productSuggest');
+    assert.strictEqual(productSuggestEvent.responseId, 'product-response-id');
+    assert.strictEqual(productSuggestEvent.searchQueryUid, 'product-query-uid');
+    assert.strictEqual(productSuggestEvent.surface, 'mondouSearchBoxPreview');
+});
+
+test('Mondou search box helper returns GTM payloads for bootstrap, suggest, and preview responses', function () {
+    var SearchBoxHelper = loadModule(
+        path.join(repoRoot, 'cartridges/app_mondou_coveo/cartridge/scripts/helpers/coveoSearchBoxHelpers.js'),
+        {
+            'dw/system/Site': {
+                getCurrent: function () {
+                    return {
+                        getCustomPreferenceValue: function () {
+                            return 'slot-homepage';
+                        }
+                    };
+                }
+            },
+            'dw/web/URLUtils': {
+                url: function (routeName) {
+                    return {
+                        toString: function () {
+                            return '/' + routeName;
+                        }
+                    };
+                }
+            },
+            'int_coveo_commerce/cartridge/scripts/services/AnalyticsService': {
+                ensureClientId: function () {
+                    return 'client-1';
+                }
+            },
+            'int_coveo_commerce/cartridge/scripts/services/CommerceApiService': {
+                querySuggest: function (params) {
+                    return {
+                        suggestions: [{
+                            value: params.query || 'croquettes'
+                        }],
+                        responseId: 'query-response-id',
+                        queryUid: 'query-uid',
+                        analytics: {
+                            clientId: 'client-1',
+                            searchHub: 'mondou_storefront',
+                            pipeline: 'mondou-search'
+                        }
+                    };
+                },
+                recommendations: function () {
+                    return {
+                        recommendations: [{
+                            id: 'sku-1',
+                            name: 'Croquettes',
+                            url: '/p/croquettes',
+                            image: 'https://images.example.com/croquettes.jpg',
+                            price: 19.99,
+                            brand: 'Mondou'
+                        }],
+                        responseId: 'recommendation-response-id',
+                        analytics: {
+                            clientId: 'client-1',
+                            searchHub: 'mondou_storefront',
+                            pipeline: 'mondou-search'
+                        }
+                    };
+                },
+                productSuggest: function () {
+                    return {
+                        products: [{
+                            id: 'sku-2',
+                            name: 'Patee',
+                            url: '/p/patee',
+                            image: 'https://images.example.com/patee.jpg',
+                            price: 9.99,
+                            brand: 'Mondou'
+                        }],
+                        responseId: 'product-response-id',
+                        queryUid: 'product-query-uid',
+                        analytics: {
+                            clientId: 'client-1',
+                            searchHub: 'mondou_storefront',
+                            pipeline: 'mondou-search'
+                        }
+                    };
+                }
+            },
+            'int_coveo_commerce/cartridge/scripts/helpers/GtmHelper': require(path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/helpers/GtmHelper.js')),
+            'int_coveo_commerce/cartridge/scripts/helpers/Logger': {
+                debug: function () {},
+                warn: function () {}
+            }
+        }
+    );
+    var bootstrap = SearchBoxHelper.buildBootstrapResponse({
+        querystring: {},
+        currentCustomer: {}
+    });
+    var suggest = SearchBoxHelper.buildSuggestResponse({
+        querystring: {
+            q: 'chien'
+        },
+        currentCustomer: {}
+    });
+    var preview = SearchBoxHelper.buildPreviewResponse({
+        querystring: {
+            q: 'chien'
+        },
+        currentCustomer: {}
+    });
+
+    assert.strictEqual(bootstrap.dataLayer.length, 2);
+    assert.strictEqual(bootstrap.dataLayer[0].operation, 'querySuggest');
+    assert.strictEqual(bootstrap.dataLayer[1].operation, 'recommendation');
+    assert.strictEqual(suggest.dataLayer.operation, 'querySuggest');
+    assert.strictEqual(suggest.dataLayer.responseId, 'query-response-id');
+    assert.strictEqual(preview.dataLayer.operation, 'productSuggest');
+    assert.strictEqual(preview.dataLayer.responseId, 'product-response-id');
+});
+
 test('Mondou Coveo search helper parses selected facet filters from querystring preferences', function () {
     var capturedParams = null;
     var helper = loadModule(

@@ -1,3 +1,6 @@
+<isif condition="${pdict.coveoDataLayer}">
+    <input type="hidden" class="js-coveo-data-layer" value="${JSON.stringify(pdict.coveoDataLayer)}" />
+</isif>
 <isif condition="${pdict.productSearch.isCategorySearch}">
     <span>
         <isif condition="${pdict.productSearch.count > 1}">

@@ -18,9 +18,92 @@
     var bootstrapCache = {};
     var suggestCache = {};
     var previewCache = {};
+    var pushedDataLayerKeys = {};
 
     function normalizeString(value) {
         return $.trim(String(value || ''));
+    }
+
+    function ensureDataLayer() {
+        if (!window.dataLayer) {
+            window.dataLayer = [];
+        }
+
+        return window.dataLayer;
+    }
+
+    function normalizeDataLayerEntries(payload) {
+        if (!payload) {
+            return [];
+        }
+
+        if ($.isArray(payload)) {
+            return payload.filter(function (entry) {
+                return !!entry;
+            });
+        }
+
+        return [payload];
+    }
+
+    function buildDataLayerKey(entry) {
+        return [
+            entry.event || '',
+            entry.operation || '',
+            entry.surface || '',
+            entry.responseId || '',
+            entry.recommendationId || '',
+            entry.categoryId || '',
+            entry.query || ''
+        ].join('::');
+    }
+
+    function pushDataLayerEntries(payload) {
+        var dataLayer = ensureDataLayer();
+
+        normalizeDataLayerEntries(payload).forEach(function (entry) {
+            var key;
+
+            if (!entry || !entry.responseId) {
+                return;
+            }
+
+            key = buildDataLayerKey(entry);
+
+            if (pushedDataLayerKeys[key]) {
+                return;
+            }
+
+            pushedDataLayerKeys[key] = true;
+            dataLayer.push(entry);
+        });
+    }
+
+    function processDataLayerMarkers(context) {
+        $(context || document).find('.js-coveo-data-layer').each(function () {
+            var $marker = $(this);
+            var rawValue = $marker.val();
+            var payload;
+
+            if ($marker.data('coveoDataLayerProcessed')) {
+                return;
+            }
+
+            if (!rawValue) {
+                $marker.data('coveoDataLayerProcessed', true);
+                return;
+            }
+
+            try {
+                payload = JSON.parse(rawValue);
+            } catch (error) {
+                $marker.data('coveoDataLayerProcessed', true);
+                return;
+            }
+
+            pushDataLayerEntries(payload);
+            $marker.data('coveoDataLayerProcessed', true);
+        });
     }
 
     function debounce(fn, wait) {
@@ -475,7 +558,10 @@
             url: url,
             method: 'GET',
             data: $.extend({}, data, getDebugParams()),
-            success: onSuccess,
+            success: function (payload) {
+                pushDataLayerEntries(payload && payload.dataLayer);
+                onSuccess(payload);
+            },
             error: onError || $.noop
         });
     }
@@ -889,6 +975,8 @@
             return !!getWrapper(this).length;
         });
 
+        processDataLayerMarkers(document);
+
         if (!$inputs.length) {
             return;
         }
@@ -898,5 +986,9 @@
         });
 
         bindDelegatedEvents();
+
+        $(document).on('ajaxComplete.coveoDataLayer', function () {
+            processDataLayerMarkers(document);
+        });
     });
 }(window.jQuery, window, document));

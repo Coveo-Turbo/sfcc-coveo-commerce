@@ -338,7 +338,8 @@ function renderCoveoUpdateGrid(req, res, next) {
     setFlowViewData(res, 'mondou-overlay');
 
     res.render('/search/productGrid', {
-        productSearch: result.productSearch
+        productSearch: result.productSearch,
+        coveoDataLayer: result.coveoDataLayer
     });
 
     return next();

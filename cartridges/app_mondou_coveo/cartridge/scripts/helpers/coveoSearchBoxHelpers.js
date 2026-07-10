@@ -4,6 +4,7 @@ var Site = require('dw/system/Site');
 var URLUtils = require('dw/web/URLUtils');
 var AnalyticsService = require('int_coveo_commerce/cartridge/scripts/services/AnalyticsService');
 var CommerceApiService = require('int_coveo_commerce/cartridge/scripts/services/CommerceApiService');
+var GtmHelper = require('int_coveo_commerce/cartridge/scripts/helpers/GtmHelper');
 var Logger = require('int_coveo_commerce/cartridge/scripts/helpers/Logger');
 
 var DEFAULT_QUERY_SUGGEST_COUNT = 5;
@@ -91,6 +92,36 @@ function buildSearchUrl(query) {
     return URLUtils.url('Search-Show', 'q', query).toString();
 }
 
+function buildQuerySuggestDataLayer(result, query, surface) {
+    return GtmHelper.buildQuerySuggestResponseEvent(result, {
+        query: query,
+        searchHub: result && result.analytics ? result.analytics.searchHub : '',
+        pipeline: result && result.analytics ? result.analytics.pipeline : '',
+        surface: surface || 'mondouSearchBox',
+        source: 'app_mondou_coveo'
+    });
+}
+
+function buildProductSuggestDataLayer(result, query, surface) {
+    return GtmHelper.buildProductSuggestResponseEvent(result, {
+        query: query,
+        searchHub: result && result.analytics ? result.analytics.searchHub : '',
+        pipeline: result && result.analytics ? result.analytics.pipeline : '',
+        surface: surface || 'mondouSearchBox',
+        source: 'app_mondou_coveo'
+    });
+}
+
+function buildRecommendationDataLayer(result, slotId, surface) {
+    return GtmHelper.buildRecommendationResponseEvent(result, {
+        slotId: slotId,
+        searchHub: result && result.analytics ? result.analytics.searchHub : '',
+        pipeline: result && result.analytics ? result.analytics.pipeline : '',
+        surface: surface || 'mondouSearchBox',
+        source: 'app_mondou_coveo'
+    });
+}
+
 function mapSuggestionItems(suggestionResult) {
     return (suggestionResult && suggestionResult.suggestions ? suggestionResult.suggestions : []).map(function (suggestion) {
         var value = normalizeString(suggestion && suggestion.value);
@@ -133,6 +164,7 @@ function getRecommendationSlotId() {
 function buildBootstrapResponse(req) {
     var baseParams = buildBaseParams(req);
     var analytics = buildFallbackAnalytics();
+    var dataLayer = [];
     var popularSearches = [];
     var popularProducts = [];
     var popularSearchesError = null;
@@ -151,6 +183,7 @@ function buildBootstrapResponse(req) {
         });
         popularSearches = mapSuggestionItems(result);
         analytics = normalizeAnalytics(result);
+        dataLayer.push(buildQuerySuggestDataLayer(result, '', 'mondouSearchBoxBootstrap'));
     } catch (error) {
         popularSearchesError = error;
         Logger.warn('Mondou Coveo search box popular-search bootstrap failed.', {
@@ -176,6 +209,7 @@ function buildBootstrapResponse(req) {
                 normalizeNumber(baseParams.productCount, DEFAULT_PRODUCT_PREVIEW_COUNT)
             );
             analytics = normalizeAnalytics(result);
+            dataLayer.push(buildRecommendationDataLayer(result, slotId, 'mondouSearchBoxBootstrap'));
         } catch (error) {
             popularProductsError = error;
             Logger.warn('Mondou Coveo search box popular-product bootstrap failed.', {
@@ -192,7 +226,8 @@ function buildBootstrapResponse(req) {
     return {
         popularSearches: popularSearches,
         popularProducts: popularProducts,
-        analytics: analytics
+        analytics: analytics,
+        dataLayer: dataLayer
     };
 }
 
@@ -205,7 +240,8 @@ function buildSuggestResponse(req) {
         return {
             query: query,
             suggestions: [],
-            analytics: buildFallbackAnalytics()
+            analytics: buildFallbackAnalytics(),
+            dataLayer: []
         };
     }
 
@@ -221,7 +257,8 @@ function buildSuggestResponse(req) {
     return {
         query: query,
         suggestions: mapSuggestionItems(result),
-        analytics: normalizeAnalytics(result)
+        analytics: normalizeAnalytics(result),
+        dataLayer: buildQuerySuggestDataLayer(result, query, 'mondouSearchBoxSuggest')
     };
 }
 
@@ -234,7 +271,8 @@ function buildPreviewResponse(req) {
         return {
             query: query,
             products: [],
-            analytics: buildFallbackAnalytics()
+            analytics: buildFallbackAnalytics(),
+            dataLayer: []
         };
     }
 
@@ -252,7 +290,8 @@ function buildPreviewResponse(req) {
             result.products,
             normalizeNumber(params.count, DEFAULT_PRODUCT_PREVIEW_COUNT)
         ),
-        analytics: normalizeAnalytics(result)
+        analytics: normalizeAnalytics(result),
+        dataLayer: buildProductSuggestDataLayer(result, query, 'mondouSearchBoxPreview')
     };
 }
 

@@ -95,7 +95,17 @@ server.get('Suggest', function (req, res, next) {
 
     try {
         suggestions = CommerceApiService.querySuggest(params);
-        res.json(suggestions);
+        res.json({
+            suggestions: suggestions.suggestions,
+            responseId: suggestions.responseId,
+            queryUid: suggestions.queryUid,
+            analytics: suggestions.analytics,
+            dataLayer: GtmHelper.buildQuerySuggestResponseEvent(suggestions, {
+                query: params.q || params.query,
+                searchHub: suggestions.analytics.searchHub,
+                pipeline: suggestions.analytics.pipeline
+            })
+        });
     } catch (error) {
         Logger.error('Coveo query suggest failed.', {
             message: error.message
@@ -121,7 +131,12 @@ server.get('ProductSuggestions', function (req, res, next) {
             products: suggestions.products,
             responseId: suggestions.responseId,
             queryUid: suggestions.queryUid,
-            analytics: suggestions.analytics
+            analytics: suggestions.analytics,
+            dataLayer: GtmHelper.buildProductSuggestResponseEvent(suggestions, {
+                query: params.q || params.query,
+                searchHub: suggestions.analytics.searchHub,
+                pipeline: suggestions.analytics.pipeline
+            })
         });
     } catch (error) {
         Logger.error('Coveo product suggest failed.', {
