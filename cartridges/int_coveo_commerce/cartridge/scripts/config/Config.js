@@ -18,12 +18,8 @@ var SERVICE_IDS = {
 
 var PREFERENCES = {
     ORGANIZATION_ID: 'coveoCommerceOrganizationId',
-    API_ENDPOINT: 'coveoCommerceApiEndpoint',
-    API_TOKEN: 'coveoCommerceApiToken',
     TRACKING_ID: 'coveoCommerceTrackingId',
     AUTH_MODE: 'coveoCommerceAuthMode',
-    AUTHENTICATED_SEARCH_API_KEY: 'coveoCommerceAuthenticatedSearchApiKey',
-    SEARCH_TOKEN_SERVICE_URL: 'coveoCommerceSearchTokenServiceUrl',
     SEARCH_TOKEN_SECURITY_PROVIDER: 'coveoCommerceSearchTokenSecurityProvider',
     SEARCH_TOKEN_USER_TYPE: 'coveoCommerceSearchTokenUserType',
     SEARCH_TOKEN_VALIDITY_MILLIS: 'coveoCommerceSearchTokenValidityMillis',
@@ -98,12 +94,8 @@ function getSettings() {
 
     return {
         organizationId: getPreferenceValue(site, PREFERENCES.ORGANIZATION_ID, ''),
-        apiEndpoint: getPreferenceValue(site, PREFERENCES.API_ENDPOINT, ''),
-        apiToken: getPreferenceValue(site, PREFERENCES.API_TOKEN, ''),
         trackingId: getPreferenceValue(site, PREFERENCES.TRACKING_ID, ''),
         authMode: normalizeAuthMode(getPreferenceValue(site, PREFERENCES.AUTH_MODE, AUTH_MODES.API_KEY)),
-        authenticatedSearchApiKey: getPreferenceValue(site, PREFERENCES.AUTHENTICATED_SEARCH_API_KEY, ''),
-        searchTokenServiceUrl: getPreferenceValue(site, PREFERENCES.SEARCH_TOKEN_SERVICE_URL, ''),
         searchTokenSecurityProvider: getPreferenceValue(
             site,
             PREFERENCES.SEARCH_TOKEN_SECURITY_PROVIDER,

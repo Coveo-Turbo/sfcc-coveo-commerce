@@ -21,30 +21,6 @@ var ENDPOINTS = {
     RECOMMENDATIONS: 'recommendations'
 };
 
-function getHttpRequest(params) {
-    if (params && params.request) {
-        return params.request;
-    }
-
-    if (typeof request !== 'undefined') {
-        return request;
-    }
-
-    return null;
-}
-
-function getHttpResponse(params) {
-    if (params && params.response) {
-        return params.response;
-    }
-
-    if (typeof response !== 'undefined') {
-        return response;
-    }
-
-    return null;
-}
-
 function validateConfiguration(settings) {
     var missing = Config.validateSettings(settings);
 
@@ -78,12 +54,14 @@ function validatePayload(operationName, payload) {
 }
 
 function buildAnalyticsContext(params) {
+    var requestParams = params || {};
+
     return AnalyticsService.buildRequestContext(
-        getHttpRequest(params),
-        getHttpResponse(params),
+        requestParams.request || null,
+        requestParams.response || null,
         {
-            searchHub: params.searchHub,
-            pipeline: params.pipeline
+            searchHub: requestParams.searchHub,
+            pipeline: requestParams.pipeline
         }
     );
 }

@@ -77,18 +77,6 @@ function parseLocale(value) {
     };
 }
 
-function getHttpRequest(params) {
-    if (params && params.request) {
-        return params.request;
-    }
-
-    if (typeof request !== 'undefined') {
-        return request;
-    }
-
-    return null;
-}
-
 function getRequestLocaleId(httpRequest) {
     if (!httpRequest) {
         return '';
@@ -138,7 +126,7 @@ function buildCurrentUrl(httpRequest) {
 
 function buildBaseContext(params) {
     var requestContext = normalizeObject(params.context);
-    var httpRequest = getHttpRequest(params);
+    var httpRequest = params && params.request ? params.request : null;
     var userAgent = httpRequest && httpRequest.httpUserAgent ? String(httpRequest.httpUserAgent) : '';
     var referrer = httpRequest && httpRequest.httpReferer ? String(httpRequest.httpReferer) : '';
     var locationUrl = params.currentUrl || buildCurrentUrl(httpRequest);
@@ -158,7 +146,7 @@ function buildBaseContext(params) {
 }
 
 function buildCommerceContext(params, config) {
-    var httpRequest = getHttpRequest(params);
+    var httpRequest = params && params.request ? params.request : null;
     var parsedRequestLocale = parseLocale((params && params.locale) || getRequestLocaleId(httpRequest));
 
     return {

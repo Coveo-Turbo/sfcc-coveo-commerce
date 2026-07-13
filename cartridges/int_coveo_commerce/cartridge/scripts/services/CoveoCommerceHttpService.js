@@ -234,7 +234,7 @@ function isRetryable(error) {
 
 function getCommerceApiBaseUrl(service, settings) {
     var config = settings || {};
-    var configuredUrl = ServiceSupport.getCredentialURL(service) || config.apiEndpoint;
+    var configuredUrl = ServiceSupport.getCredentialURL(service);
 
     if (!configuredUrl) {
         throw new Error('Missing Coveo Commerce service credential URL.');
@@ -257,53 +257,53 @@ function getAccessToken(service, settings, authContext) {
         return SearchTokenService.requestSearchToken(authContext || {}, config);
     }
 
-    return ServiceSupport.getCredentialPassword(service) || config.apiToken || '';
+    return ServiceSupport.getCredentialPassword(service);
 }
 
 function buildMockPayload(endpointPath) {
     switch (endpointPath) {
-    case 'search/querySuggest':
-        return {
-            completions: [],
-            responseId: 'mock-response-id',
-            queryUid: 'mock-query-uid'
-        };
-    case 'search/productSuggest':
-        return {
-            items: [],
-            responseId: 'mock-response-id',
-            queryUid: 'mock-query-uid'
-        };
-    case 'recommendations':
-        return {
-            recommendations: [],
-            responseId: 'mock-response-id'
-        };
-    case 'listing':
-        return {
-            products: [],
-            facets: [],
-            pagination: {
-                page: 1,
-                perPage: 0,
-                totalEntries: 0,
-                totalPages: 0
-            },
-            responseId: 'mock-response-id'
-        };
-    default:
-        return {
-            products: [],
-            facets: [],
-            pagination: {
-                page: 1,
-                perPage: 0,
-                totalEntries: 0,
-                totalPages: 0
-            },
-            responseId: 'mock-response-id',
-            queryUid: 'mock-query-uid'
-        };
+        case 'search/querySuggest':
+            return {
+                completions: [],
+                responseId: 'mock-response-id',
+                queryUid: 'mock-query-uid'
+            };
+        case 'search/productSuggest':
+            return {
+                items: [],
+                responseId: 'mock-response-id',
+                queryUid: 'mock-query-uid'
+            };
+        case 'recommendations':
+            return {
+                recommendations: [],
+                responseId: 'mock-response-id'
+            };
+        case 'listing':
+            return {
+                products: [],
+                facets: [],
+                pagination: {
+                    page: 1,
+                    perPage: 0,
+                    totalEntries: 0,
+                    totalPages: 0
+                },
+                responseId: 'mock-response-id'
+            };
+        default:
+            return {
+                products: [],
+                facets: [],
+                pagination: {
+                    page: 1,
+                    perPage: 0,
+                    totalEntries: 0,
+                    totalPages: 0
+                },
+                responseId: 'mock-response-id',
+                queryUid: 'mock-query-uid'
+            };
     }
 }
 

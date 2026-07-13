@@ -1,6 +1,6 @@
 # Configuration Guide
 
-`int_coveo_commerce` reads its runtime settings from site preferences through `Config.js`.
+`int_coveo_commerce` reads business/runtime settings from site preferences through `Config.js` and reads outbound host and secret configuration from SFCC service credentials and profiles.
 
 Before these preferences and service definitions appear in Business Manager, import the metadata package from:
 
@@ -46,10 +46,6 @@ Service notes:
 
 | Preference ID | Purpose | Default |
 | --- | --- | --- |
-| `coveoCommerceApiEndpoint` | Legacy fallback for the Commerce API base URL when the service credential URL is not configured | empty |
-| `coveoCommerceApiToken` | Legacy fallback bearer token used when `coveoCommerceAuthMode=apiKey` and the service credential password is empty | empty |
-| `coveoCommerceAuthenticatedSearchApiKey` | Legacy fallback private API key used when `coveoCommerceAuthMode=searchToken` and the service credential password is empty | empty |
-| `coveoCommerceSearchTokenServiceUrl` | Legacy override for the full search-token endpoint URL | empty |
 | `coveoCommerceSearchTokenSecurityProvider` | Security identity provider used when minting search tokens | `Email Security Provider` |
 | `coveoCommerceSearchTokenUserType` | User identity type for minted search tokens | `User` |
 | `coveoCommerceSearchTokenValidityMillis` | Search token lifetime in milliseconds | `3600000` |
@@ -67,7 +63,7 @@ Service notes:
 
 - `apiKey` mode is appropriate for public storefronts where a shared Commerce bearer token is acceptable.
 - `searchToken` mode is intended for authenticated storefronts. In this mode, SFCC generates search tokens on the server side and uses them when calling the Commerce API. The private API key used to mint those tokens never leaves the server.
-- Prefer configuring the API host and secrets on the SFCC service credentials. The legacy endpoint and secret site preferences remain only as backwards-compatible fallbacks.
+- Configure the API host and secrets only on the SFCC service credentials. The cartridge no longer reads endpoint or secret values from site preferences.
 - When configuring search-token authentication for Coveo Commerce, leave search-hub enforcement out of the underlying API key and generated token. The Commerce API sets the search hub automatically.
 - Storefront requests resolve locale context dynamically:
   - `language` and `country` default from the current request locale, such as `fr_CA`

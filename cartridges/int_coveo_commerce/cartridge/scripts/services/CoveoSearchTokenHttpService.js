@@ -7,7 +7,7 @@ var UrlHelper = require('*/cartridge/scripts/helpers/UrlHelper');
 
 function getServiceUrl(service, settings) {
     var config = settings || {};
-    var configuredUrl = ServiceSupport.getCredentialURL(service) || config.searchTokenServiceUrl;
+    var configuredUrl = ServiceSupport.getCredentialURL(service);
 
     if (configuredUrl) {
         if (configuredUrl.indexOf('/rest/search/token') !== -1) {
@@ -21,7 +21,7 @@ function getServiceUrl(service, settings) {
 }
 
 function getPrivateApiKey(service, settings) {
-    return ServiceSupport.getCredentialPassword(service) || (settings && settings.authenticatedSearchApiKey) || '';
+    return ServiceSupport.getCredentialPassword(service);
 }
 
 function createService() {

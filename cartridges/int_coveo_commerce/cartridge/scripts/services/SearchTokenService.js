@@ -1,5 +1,4 @@
 'use strict';
-/* global session */
 
 var Config = require('*/cartridge/scripts/config/Config');
 var Logger = require('*/cartridge/scripts/helpers/Logger');
@@ -8,19 +7,7 @@ var TOKEN_CACHE_KEY = 'coveoCommerceSearchTokenCache';
 var TOKEN_CACHE_SAFETY_WINDOW_MILLIS = 5000;
 
 function getCurrentCustomer(context) {
-    if (context && context.currentCustomer) {
-        return context.currentCustomer;
-    }
-
-    if (context && context.customer) {
-        return context.customer;
-    }
-
-    if (typeof customer !== 'undefined') {
-        return customer;
-    }
-
-    return null;
+    return context && (context.currentCustomer || context.customer) ? (context.currentCustomer || context.customer) : null;
 }
 
 function getTokenOptions(context) {
@@ -31,20 +18,12 @@ function getTokenOptions(context) {
     return {};
 }
 
-function getSessionContainer(context) {
-    if (context && context.session) {
-        return context.session;
-    }
-
-    if (typeof session !== 'undefined') {
-        return session;
-    }
-
-    return null;
+function getSession(context) {
+    return context && context.session ? context.session : null;
 }
 
 function getPrivacyCache(context) {
-    var sessionContainer = getSessionContainer(context);
+    var sessionContainer = getSession(context);
 
     if (sessionContainer && sessionContainer.privacyCache && sessionContainer.privacyCache.get && sessionContainer.privacyCache.set) {
         return sessionContainer.privacyCache;
@@ -54,7 +33,7 @@ function getPrivacyCache(context) {
 }
 
 function getPrivacyStore(context) {
-    var sessionContainer = getSessionContainer(context);
+    var sessionContainer = getSession(context);
 
     if (sessionContainer && sessionContainer.privacy) {
         return sessionContainer.privacy;
@@ -356,7 +335,7 @@ function extractToken(rawResponse) {
 function requestSearchToken(context, settings) {
     var config = settings || Config.getSettings();
     var payload = buildTokenRequestBody(context || {}, config);
-    var cacheScope = config.searchTokenServiceUrl || config.organizationId || Config.SERVICE_IDS.SEARCH_TOKEN;
+    var cacheScope = config.organizationId || Config.SERVICE_IDS.SEARCH_TOKEN;
     var cacheKey = buildCacheKey(cacheScope, payload);
     var cachedToken = readCachedToken(context, cacheKey);
     var response;

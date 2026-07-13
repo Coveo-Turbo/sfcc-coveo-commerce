@@ -252,7 +252,6 @@ test('SearchTokenService caches generated search tokens by shopper identity', fu
     );
     var settings = {
         organizationId: 'org-1',
-        authenticatedSearchApiKey: 'private-key-1',
         searchTokenValidityMillis: 3600000,
         searchTokenSecurityProvider: 'Email Security Provider',
         searchTokenUserType: 'User'

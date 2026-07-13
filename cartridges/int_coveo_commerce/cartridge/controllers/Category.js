@@ -1,26 +1,11 @@
 'use strict';
+/* global request, response */
 
 var server = require('server');
 var CommerceApiService = require('*/cartridge/scripts/services/CommerceApiService');
 var ListingResult = require('*/cartridge/models/ListingResult');
 var GtmHelper = require('*/cartridge/scripts/helpers/GtmHelper');
 var Logger = require('*/cartridge/scripts/helpers/Logger');
-
-function getHttpRequest() {
-    if (typeof request !== 'undefined') {
-        return request;
-    }
-
-    return null;
-}
-
-function getHttpResponse() {
-    if (typeof response !== 'undefined') {
-        return response;
-    }
-
-    return null;
-}
 
 function buildParams(req) {
     var query = req.querystring || {};
@@ -33,21 +18,10 @@ function buildParams(req) {
     params.categoryId = params.categoryId || params.cgid || '';
     params.currentCustomer = req.currentCustomer;
     params.session = req.session;
-    params.request = getHttpRequest();
-    params.response = getHttpResponse();
+    params.request = request;
+    params.response = response;
 
     return params;
-}
-
-function setStatus(res, statusCode) {
-    if (res.setStatusCode) {
-        res.setStatusCode(statusCode);
-        return;
-    }
-
-    if (getHttpResponse() && getHttpResponse().setStatus) {
-        getHttpResponse().setStatus(statusCode);
-    }
 }
 
 function renderPageError(res, error) {
@@ -56,7 +30,7 @@ function renderPageError(res, error) {
         stack: error.stack
     });
 
-    setStatus(res, 502);
+    res.setStatusCode(502);
     res.setViewData({
         coveoListing: new ListingResult(),
         coveoError: {
