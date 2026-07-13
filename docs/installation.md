@@ -49,6 +49,7 @@ The archive is packaged with the required SFCC root folder:
 int_coveo_commerce_site_preferences/
   meta/
     system-objecttype-extensions.xml
+  services.xml
 ```
 
 Import that ZIP in Business Manager through:
@@ -66,16 +67,16 @@ Merchant Tools -> Site Preferences -> Custom Preferences -> Coveo Commerce
 
 ## Configure SFCC Services
 
-Create these HTTP services in Business Manager:
+The metadata package creates these HTTP services in Business Manager:
 
 - `coveo.http.commerce.api`
 - `coveo.http.search.token`
 
 Recommended setup:
 
-- Create an HTTP service profile for each service with the timeout and rate-limiting values you want SFCC to enforce.
+- Review the imported service profile and credential settings, and adjust them if your instance needs different timeout, rate limiting, or circuit-breaker values.
 - Use `NONE` for authentication because the cartridge sets Coveo bearer headers at runtime.
-- Point the credential URL at the matching Coveo host, such as `https://platform.cloud.coveo.com` for Commerce API calls and `https://<organization>.org.coveo.com` for search-token calls. The cartridge sets the final request URL at runtime.
+- The imported credential URLs are starter values. You can keep them as-is because the cartridge overrides the final request URL at runtime, or align them to your target Coveo hosts for clarity.
 
 Business Manager path:
 

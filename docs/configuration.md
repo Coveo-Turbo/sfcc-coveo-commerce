@@ -2,10 +2,10 @@
 
 `int_coveo_commerce` reads its runtime settings from site preferences through `Config.js`.
 
-Before these preferences appear in Business Manager, import the metadata package from:
+Before these preferences and service definitions appear in Business Manager, import the metadata package from:
 
 ```text
-metadata/meta/system-objecttype-extensions.xml
+metadata/
 ```
 
 You can bundle that import package with:
@@ -18,7 +18,7 @@ Create these custom preferences in Business Manager or define them through your 
 
 ## Required SFCC Services
 
-`int_coveo_commerce` now sends outbound requests through SFCC `dw/svc/LocalServiceRegistry`. Create these HTTP services in Business Manager before enabling the cartridge:
+`int_coveo_commerce` now sends outbound requests through SFCC `dw/svc/LocalServiceRegistry`. The metadata package creates these HTTP services:
 
 | Service ID | Purpose |
 | --- | --- |
@@ -28,7 +28,7 @@ Create these custom preferences in Business Manager or define them through your 
 Service notes:
 
 - Configure authentication as `NONE`; the cartridge adds bearer headers itself.
-- Set the credential URL to the matching Coveo host. The cartridge overrides the full request URL at runtime.
+- The imported credential URLs are starter values. The cartridge overrides the full request URL at runtime.
 - Prefer managing timeout, rate limiting, and circuit-breaker behavior in the service profile so SFCC owns the outbound-call policy.
 
 ## Required Preferences
