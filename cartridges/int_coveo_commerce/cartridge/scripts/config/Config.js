@@ -12,6 +12,11 @@ var AUTH_MODES = {
     SEARCH_TOKEN: 'searchToken'
 };
 
+var SERVICE_IDS = {
+    COMMERCE_API: 'coveo.http.commerce.api',
+    SEARCH_TOKEN: 'coveo.http.search.token'
+};
+
 var PREFERENCES = {
     ORGANIZATION_ID: 'coveoCommerceOrganizationId',
     API_ENDPOINT: 'coveoCommerceApiEndpoint',
@@ -23,7 +28,6 @@ var PREFERENCES = {
     SEARCH_TOKEN_SECURITY_PROVIDER: 'coveoCommerceSearchTokenSecurityProvider',
     SEARCH_TOKEN_USER_TYPE: 'coveoCommerceSearchTokenUserType',
     SEARCH_TOKEN_VALIDITY_MILLIS: 'coveoCommerceSearchTokenValidityMillis',
-    DEFAULT_CATALOG: 'coveoCommerceDefaultCatalog',
     LOCALE: 'coveoCommerceLocale',
     LANGUAGE: 'coveoCommerceLanguage',
     COUNTRY: 'coveoCommerceCountry',
@@ -112,7 +116,6 @@ function getSettings() {
             getPreferenceValue(site, PREFERENCES.SEARCH_TOKEN_VALIDITY_MILLIS, DEFAULT_SEARCH_TOKEN_VALIDITY_MILLIS),
             DEFAULT_SEARCH_TOKEN_VALIDITY_MILLIS
         ),
-        defaultCatalog: getPreferenceValue(site, PREFERENCES.DEFAULT_CATALOG, ''),
         locale: locale,
         language: getPreferenceValue(site, PREFERENCES.LANGUAGE, parsedLocale.language),
         country: getPreferenceValue(site, PREFERENCES.COUNTRY, parsedLocale.country),
@@ -124,24 +127,6 @@ function getSettings() {
         timeoutMillis: normalizeNumber(getPreferenceValue(site, PREFERENCES.TIMEOUT_MILLIS, DEFAULT_TIMEOUT_MILLIS), DEFAULT_TIMEOUT_MILLIS),
         retryCount: normalizeNumber(getPreferenceValue(site, PREFERENCES.RETRY_COUNT, DEFAULT_RETRY_COUNT), DEFAULT_RETRY_COUNT)
     };
-}
-
-function getRequiredPreferenceIds(settings) {
-    var config = settings || getSettings();
-    var required = [
-        PREFERENCES.ORGANIZATION_ID,
-        PREFERENCES.API_ENDPOINT,
-        PREFERENCES.TRACKING_ID
-    ];
-
-    if (config.authMode === AUTH_MODES.SEARCH_TOKEN) {
-        required.push(PREFERENCES.AUTHENTICATED_SEARCH_API_KEY);
-        return required;
-    }
-
-    required.push(PREFERENCES.API_TOKEN);
-
-    return required;
 }
 
 function validateSettings(settings) {
@@ -177,8 +162,8 @@ function validateSettings(settings) {
 
 module.exports = {
     AUTH_MODES: AUTH_MODES,
+    SERVICE_IDS: SERVICE_IDS,
     PREFERENCES: PREFERENCES,
     getSettings: getSettings,
-    getRequiredPreferenceIds: getRequiredPreferenceIds,
     validateSettings: validateSettings
 };

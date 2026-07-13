@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns="http://www.demandware.com/xml/impex/services/2014-09-26">
+    <service-credential service-credential-id="coveo.http.commerce.api.cred">
+        <url>https://platform.cloud.coveo.com</url>
+        <user-id/>
+        <password masked="true"></password>
+    </service-credential>
+    <service-credential service-credential-id="coveo.http.search.token.cred">
+        <url>https://organization-placeholder.org.coveo.com</url>
+        <user-id/>
+        <password masked="true"></password>
+    </service-credential>
+
+    <service-profile service-profile-id="coveo.http.commerce.api.profile">
+        <timeout-millis>5000</timeout-millis>
+        <rate-limit-enabled>false</rate-limit-enabled>
+        <rate-limit-calls>0</rate-limit-calls>
+        <rate-limit-millis>0</rate-limit-millis>
+        <cb-enabled>true</cb-enabled>
+        <cb-calls>0</cb-calls>
+        <cb-millis>0</cb-millis>
+    </service-profile>
+    <service-profile service-profile-id="coveo.http.search.token.profile">
+        <timeout-millis>5000</timeout-millis>
+        <rate-limit-enabled>false</rate-limit-enabled>
+        <rate-limit-calls>0</rate-limit-calls>
+        <rate-limit-millis>0</rate-limit-millis>
+        <cb-enabled>true</cb-enabled>
+        <cb-calls>0</cb-calls>
+        <cb-millis>0</cb-millis>
+    </service-profile>
+
+    <service service-id="coveo.http.commerce.api">
+        <service-type>HTTP</service-type>
+        <enabled>true</enabled>
+        <log-prefix>coveo-commerce-api</log-prefix>
+        <comm-log-enabled>false</comm-log-enabled>
+        <force-prd-enabled>false</force-prd-enabled>
+        <mock-mode-enabled>false</mock-mode-enabled>
+        <profile-id>coveo.http.commerce.api.profile</profile-id>
+        <credential-id>coveo.http.commerce.api.cred</credential-id>
+    </service>
+    <service service-id="coveo.http.search.token">
+        <service-type>HTTP</service-type>
+        <enabled>true</enabled>
+        <log-prefix>coveo-search-token</log-prefix>
+        <comm-log-enabled>false</comm-log-enabled>
+        <force-prd-enabled>false</force-prd-enabled>
+        <mock-mode-enabled>false</mock-mode-enabled>
+        <profile-id>coveo.http.search.token.profile</profile-id>
+        <credential-id>coveo.http.search.token.cred</credential-id>
+    </service>
+</services>

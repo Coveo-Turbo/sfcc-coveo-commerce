@@ -300,28 +300,34 @@ test('SearchTokenService caches generated search tokens by shopper identity', fu
                     return Buffer.from(this.value, 'utf8').toString('hex');
                 };
             },
-            'dw/net/HTTPClient': function () {
-                this.open = function () {};
-                this.setTimeout = function () {};
-                this.setRequestHeader = function () {};
-                this.send = function () {
+            '*/cartridge/scripts/services/LocalServiceClient': {
+                call: function (serviceId, options) {
                     callCount += 1;
-                    this.statusCode = 200;
-                    this.text = JSON.stringify({
-                        token: 'cached-token'
-                    });
-                };
+                    assert.strictEqual(serviceId, 'coveo.http.search.token');
+                    assert.strictEqual(options.method, 'POST');
+                    assert.strictEqual(options.headers.Authorization, 'Bearer private-key-1');
+
+                    return {
+                        statusCode: 200,
+                        body: JSON.stringify({
+                            token: 'cached-token'
+                        })
+                    };
+                }
+            },
+            '*/cartridge/scripts/config/Config': {
+                SERVICE_IDS: {
+                    SEARCH_TOKEN: 'coveo.http.search.token'
+                },
+                getSettings: function () {
+                    return {};
+                }
             },
             '*/cartridge/scripts/helpers/Logger': {
                 debug: function () {},
                 info: function () {},
                 error: function () {},
                 warn: function () {}
-            },
-            '*/cartridge/scripts/config/Config': {
-                getSettings: function () {
-                    return {};
-                }
             }
         }
     );
@@ -346,6 +352,91 @@ test('SearchTokenService caches generated search tokens by shopper identity', fu
     assert.strictEqual(SearchTokenService.requestSearchToken(authContext, settings), 'cached-token');
     assert.strictEqual(SearchTokenService.requestSearchToken(authContext, settings), 'cached-token');
     assert.strictEqual(callCount, 1);
+});
+
+test('LocalServiceClient uses LocalServiceRegistry to build HTTP requests', function () {
+    var capturedServiceId = '';
+    var capturedMethod = '';
+    var capturedUrl = '';
+    var capturedHeaders = {};
+    var capturedPayload = '';
+    var capturedTimeout = 0;
+    var LocalServiceClient = loadModule(
+        path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/services/LocalServiceClient.js'),
+        {
+            'dw/svc/LocalServiceRegistry': {
+                createService: function (serviceId, callbacks) {
+                    var client = {
+                        statusCode: 200,
+                        text: '{"token":"service-token"}',
+                        timeout: 0,
+                        setTimeout: function (value) {
+                            this.timeout = value;
+                            capturedTimeout = value;
+                        },
+                        getAllResponseHeaders: function () {
+                            return {
+                                'Content-Type': 'application/json'
+                            };
+                        }
+                    };
+
+                    capturedServiceId = serviceId;
+
+                    return {
+                        setAuthentication: function () {},
+                        setRequestMethod: function (value) {
+                            capturedMethod = value;
+                        },
+                        setURL: function (value) {
+                            capturedUrl = value;
+                        },
+                        setEncoding: function () {},
+                        addHeader: function (name, value) {
+                            capturedHeaders[name] = value;
+                        },
+                        getClient: function () {
+                            return client;
+                        },
+                        call: function (requestData) {
+                            capturedPayload = callbacks.createRequest(this, requestData);
+
+                            return {
+                                ok: true,
+                                object: callbacks.parseResponse(this, client)
+                            };
+                        }
+                    };
+                }
+            }
+        }
+    );
+    var response = LocalServiceClient.call('coveo.http.commerce.api', {
+        name: 'search',
+        method: 'POST',
+        url: 'https://platform.cloud.coveo.com/rest/search',
+        headers: {
+            Authorization: 'Bearer commerce-token',
+            'Content-Type': 'application/json'
+        },
+        body: {
+            query: 'chien'
+        },
+        timeout: 3000
+    });
+
+    assert.strictEqual(capturedServiceId, 'coveo.http.commerce.api');
+    assert.strictEqual(capturedMethod, 'POST');
+    assert.strictEqual(capturedUrl, 'https://platform.cloud.coveo.com/rest/search');
+    assert.strictEqual(capturedHeaders.Authorization, 'Bearer commerce-token');
+    assert.strictEqual(capturedHeaders['Content-Type'], 'application/json');
+    assert.strictEqual(capturedPayload, JSON.stringify({
+        query: 'chien'
+    }));
+    assert.strictEqual(capturedTimeout, 3000);
+    assert.strictEqual(response.statusCode, 200);
+    assert.strictEqual(response.ok, true);
+    assert.strictEqual(response.body, '{"token":"service-token"}');
 });
 
 test('GtmHelper builds search payload with response metadata', function () {

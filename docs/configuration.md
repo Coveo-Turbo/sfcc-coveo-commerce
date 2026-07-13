@@ -2,10 +2,10 @@
 
 `int_coveo_commerce` reads its runtime settings from site preferences through `Config.js`.
 
-Before these preferences appear in Business Manager, import the metadata package from:
+Before these preferences and service definitions appear in Business Manager, import the metadata package from:
 
 ```text
-metadata/meta/system-objecttype-extensions.xml
+metadata/
 ```
 
 You can bundle that import package with:
@@ -15,6 +15,21 @@ npm run packageMetadata
 ```
 
 Create these custom preferences in Business Manager or define them through your normal SFCC metadata import flow before enabling the cartridge on a site.
+
+## Required SFCC Services
+
+`int_coveo_commerce` now sends outbound requests through SFCC `dw/svc/LocalServiceRegistry`. The metadata package creates these HTTP services:
+
+| Service ID | Purpose |
+| --- | --- |
+| `coveo.http.commerce.api` | Commerce API search, listing, suggestion, and recommendation calls |
+| `coveo.http.search.token` | Server-side search-token generation |
+
+Service notes:
+
+- Configure authentication as `NONE`; the cartridge adds bearer headers itself.
+- The imported credential URLs are starter values. The cartridge overrides the full request URL at runtime.
+- Prefer managing timeout, rate limiting, and circuit-breaker behavior in the service profile so SFCC owns the outbound-call policy.
 
 ## Required Preferences
 
@@ -41,7 +56,6 @@ https://platform.cloud.coveo.com/rest/organizations/<ORG_ID>/commerce/v2
 | `coveoCommerceSearchTokenSecurityProvider` | Security identity provider used when minting search tokens | `Email Security Provider` |
 | `coveoCommerceSearchTokenUserType` | User identity type for minted search tokens | `User` |
 | `coveoCommerceSearchTokenValidityMillis` | Search token lifetime in milliseconds | `3600000` |
-| `coveoCommerceDefaultCatalog` | Default catalog identifier | empty |
 | `coveoCommerceLocale` | Optional fallback locale used when the current storefront request locale is not available | empty |
 | `coveoCommerceLanguage` | Optional fallback language code. Runtime requests use the storefront locale first, then this preference | empty |
 | `coveoCommerceCountry` | Optional fallback country code. Runtime requests use the storefront locale first, then this preference | empty |

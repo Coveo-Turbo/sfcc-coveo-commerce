@@ -1,40 +1,12 @@
 'use strict';
 
-var SFCCHttpClient = require('dw/net/HTTPClient');
 var AuthenticationService = require('*/cartridge/scripts/services/AuthenticationService');
 var Config = require('*/cartridge/scripts/config/Config');
 var Logger = require('*/cartridge/scripts/helpers/Logger');
+var LocalServiceClient = require('*/cartridge/scripts/services/LocalServiceClient');
 
 function normalizeBoolean(value) {
     return value === true || value === 'true' || value === '1';
-}
-
-function getNow() {
-    return new Date().getTime();
-}
-
-function getStatusCode(httpClient) {
-    if (httpClient.getStatusCode) {
-        return httpClient.getStatusCode();
-    }
-
-    return httpClient.statusCode;
-}
-
-function getText(httpClient) {
-    if (httpClient.getText) {
-        return httpClient.getText();
-    }
-
-    return httpClient.text;
-}
-
-function getHeaders(httpClient) {
-    if (!httpClient.getAllResponseHeaders) {
-        return {};
-    }
-
-    return httpClient.getAllResponseHeaders();
 }
 
 function parseBody(rawBody, parseJson) {
@@ -59,31 +31,6 @@ function parseJsonSafely(rawValue, fallback) {
     } catch (error) {
         return fallback;
     }
-}
-
-function getHttpResponse(authContext) {
-    if (authContext && authContext.response) {
-        return authContext.response;
-    }
-
-    if (typeof response !== 'undefined') {
-        return response;
-    }
-
-    return null;
-}
-
-function setResponseHeader() {
-    return;
-}
-
-function sanitizeHeaderValue(value, maxLength) {
-    return String(value || '')
-        .replace(/[\r\n]+/g, ' ')
-        .replace(/[^\x20-\x7E]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .replace(/^\s+|\s+$/g, '')
-        .slice(0, maxLength || 512);
 }
 
 function summarizeFacetValue(value) {
@@ -112,26 +59,6 @@ function summarizeFacets(facets) {
             values: (facet.values || []).map(summarizeFacetValue)
         };
     });
-}
-
-function stringifyFacetValues(values) {
-    return (values || []).map(function (value) {
-        if (typeof value === 'string') {
-            return value;
-        }
-
-        if (typeof value.value !== 'undefined') {
-            return String(value.value);
-        }
-
-        if (typeof value.start !== 'undefined' || typeof value.end !== 'undefined') {
-            return [value.start, value.end].join('-');
-        }
-
-        return '';
-    }).filter(function (value) {
-        return value;
-    }).join('|');
 }
 
 function summarizeContext(context) {
@@ -275,74 +202,6 @@ function buildFailureDebugSummary(operationName, error, attempt) {
     return summary;
 }
 
-function buildRequestDebugHeader(summary) {
-    var parts = [
-        'operation=' + summary.operation
-    ];
-    var facets = (summary.facets || []).map(function (facet) {
-        return facet.facetId + '=' + stringifyFacetValues(facet.values);
-    }).filter(function (facet) {
-        return facet;
-    }).join(',');
-
-    if (summary.query) {
-        parts.push('query=' + summary.query);
-    }
-
-    if (facets) {
-        parts.push('facets=' + facets);
-    }
-
-    if (summary.page !== null) {
-        parts.push('page=' + summary.page);
-    }
-
-    if (summary.perPage !== null) {
-        parts.push('perPage=' + summary.perPage);
-    }
-
-    return sanitizeHeaderValue(parts.join(';'));
-}
-
-function buildResponseDebugHeader(summary) {
-    var parts = [
-        'operation=' + summary.operation,
-        'status=' + summary.statusCode
-    ];
-
-    if (typeof summary.total !== 'undefined') {
-        parts.push('total=' + summary.total);
-    }
-
-    if (typeof summary.productCount !== 'undefined') {
-        parts.push('products=' + summary.productCount);
-    }
-
-    if (typeof summary.facetCount !== 'undefined') {
-        parts.push('facets=' + summary.facetCount);
-    }
-
-    if (summary.responseId) {
-        parts.push('responseId=' + summary.responseId);
-    }
-
-    return sanitizeHeaderValue(parts.join(';'));
-}
-
-function buildFailureDebugHeader(summary) {
-    var parts = [
-        'operation=' + summary.operation,
-        'attempt=' + summary.attempt,
-        'message=' + summary.message
-    ];
-
-    if (summary.statusCode) {
-        parts.push('status=' + summary.statusCode);
-    }
-
-    return sanitizeHeaderValue(parts.join(';'));
-}
-
 function isCoveoDebugEnabled(authContext) {
     return !!(authContext && normalizeBoolean(authContext.coveoDebug));
 }
@@ -366,39 +225,6 @@ function isRetryable(error) {
     return error.retryable === true;
 }
 
-function send(method, url, headers, body, timeoutMillis) {
-    var httpClient = new SFCCHttpClient();
-    var start = getNow();
-    var statusCode;
-    var rawBody;
-    var response;
-
-    httpClient.open(method, url);
-    httpClient.setTimeout(timeoutMillis);
-
-    Object.keys(headers).forEach(function (headerName) {
-        httpClient.setRequestHeader(headerName, headers[headerName]);
-    });
-
-    if (body) {
-        httpClient.send(body);
-    } else {
-        httpClient.send();
-    }
-
-    statusCode = getStatusCode(httpClient);
-    rawBody = getText(httpClient);
-    response = {
-        statusCode: statusCode,
-        ok: statusCode >= 200 && statusCode < 300,
-        body: rawBody,
-        headers: getHeaders(httpClient),
-        duration: getNow() - start
-    };
-
-    return response;
-}
-
 function request(options) {
     var settings = Config.getSettings();
     var requestOptions = options || {};
@@ -410,17 +236,12 @@ function request(options) {
     var retryCount = typeof requestOptions.retryCount === 'number' ? requestOptions.retryCount : settings.retryCount;
     var maxAttempts = Math.max(1, retryCount + 1);
     var debugEnabled = isCoveoDebugEnabled(requestOptions.authContext);
-    var httpResponse = getHttpResponse(requestOptions.authContext);
     var response;
     var attempt;
     var error;
     var requestDebugSummary;
     var responseDebugSummary;
     var failureDebugSummary;
-
-    if (payload && typeof payload !== 'string') {
-        payload = JSON.stringify(payload);
-    }
 
     if (debugEnabled) {
         requestDebugSummary = buildRequestDebugSummary(
@@ -429,18 +250,19 @@ function request(options) {
             requestOptions.url,
             requestOptions.body
         );
-
-        setResponseHeader(
-            httpResponse,
-            'X-Coveo-Commerce-Debug-Request',
-            buildRequestDebugHeader(requestDebugSummary)
-        );
         Logger.warn('Coveo Commerce debug request.', requestDebugSummary);
     }
 
     for (attempt = 1; attempt <= maxAttempts; attempt += 1) {
         try {
-            response = send(method, requestOptions.url, headers, payload, timeoutMillis);
+            response = LocalServiceClient.call(Config.SERVICE_IDS.COMMERCE_API, {
+                name: operationName,
+                method: method,
+                url: requestOptions.url,
+                headers: headers,
+                body: payload,
+                timeout: timeoutMillis
+            });
             response.data = parseBody(response.body, requestOptions.parseJson !== false);
 
             if (!response.ok) {
@@ -459,12 +281,6 @@ function request(options) {
                     operationName,
                     response,
                     attempt
-                );
-
-                setResponseHeader(
-                    httpResponse,
-                    'X-Coveo-Commerce-Debug-Response',
-                    buildResponseDebugHeader(responseDebugSummary)
                 );
                 Logger.warn('Coveo Commerce debug response.', responseDebugSummary);
             }
@@ -485,12 +301,6 @@ function request(options) {
                     operationName,
                     requestError,
                     attempt
-                );
-
-                setResponseHeader(
-                    httpResponse,
-                    'X-Coveo-Commerce-Debug-Failure',
-                    buildFailureDebugHeader(failureDebugSummary)
                 );
                 Logger.warn('Coveo Commerce debug failure.', failureDebugSummary);
             }

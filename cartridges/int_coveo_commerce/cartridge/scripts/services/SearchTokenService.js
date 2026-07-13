@@ -1,9 +1,9 @@
 'use strict';
 /* global session */
 
-var SFCCHttpClient = require('dw/net/HTTPClient');
 var Config = require('*/cartridge/scripts/config/Config');
 var Logger = require('*/cartridge/scripts/helpers/Logger');
+var LocalServiceClient = require('*/cartridge/scripts/services/LocalServiceClient');
 var TOKEN_CACHE_KEY = 'coveoCommerceSearchTokenCache';
 var TOKEN_CACHE_SAFETY_WINDOW_MILLIS = 5000;
 
@@ -361,31 +361,14 @@ function extractToken(rawResponse) {
     return responseText;
 }
 
-function getStatusCode(httpClient) {
-    if (httpClient.getStatusCode) {
-        return httpClient.getStatusCode();
-    }
-
-    return httpClient.statusCode;
-}
-
-function getText(httpClient) {
-    if (httpClient.getText) {
-        return httpClient.getText();
-    }
-
-    return httpClient.text;
-}
-
 function requestSearchToken(context, settings) {
     var config = settings || Config.getSettings();
     var endpoint = getSearchTokenEndpoint(config);
     var payload = buildTokenRequestBody(context || {}, config);
     var cacheKey = buildCacheKey(endpoint, payload);
-    var httpClient = new SFCCHttpClient();
     var cachedToken = readCachedToken(context, cacheKey);
+    var response;
     var responseText;
-    var statusCode;
     var token;
 
     if (cachedToken) {
@@ -396,23 +379,40 @@ function requestSearchToken(context, settings) {
         return cachedToken;
     }
 
-    httpClient.open('POST', endpoint);
-    httpClient.setTimeout(config.timeoutMillis);
-    httpClient.setRequestHeader('Authorization', 'Bearer ' + config.authenticatedSearchApiKey);
-    httpClient.setRequestHeader('Accept', 'text/plain, application/json');
-    httpClient.setRequestHeader('Content-Type', 'application/json');
-    httpClient.send(JSON.stringify(payload));
-
-    statusCode = getStatusCode(httpClient);
-    responseText = getText(httpClient);
-
-    if (statusCode < 200 || statusCode >= 300) {
+    try {
+        response = LocalServiceClient.call(Config.SERVICE_IDS.SEARCH_TOKEN, {
+            name: 'searchToken',
+            method: 'POST',
+            url: endpoint,
+            headers: {
+                Authorization: 'Bearer ' + config.authenticatedSearchApiKey,
+                Accept: 'text/plain, application/json',
+                'Content-Type': 'application/json'
+            },
+            body: payload,
+            timeout: config.timeoutMillis
+        });
+    } catch (error) {
         Logger.error('Coveo search token request failed.', {
-            statusCode: statusCode,
+            endpoint: endpoint,
+            message: error.message,
+            statusCode: error.statusCode || null,
+            serviceStatus: error.serviceStatus || null,
+            unavailableReason: error.unavailableReason || null
+        });
+
+        throw error;
+    }
+
+    responseText = response.body;
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+        Logger.error('Coveo search token request failed.', {
+            statusCode: response.statusCode,
             endpoint: endpoint
         });
 
-        throw new Error('Unable to retrieve a Coveo search token. Status: ' + statusCode + '.');
+        throw new Error('Unable to retrieve a Coveo search token. Status: ' + response.statusCode + '.');
     }
 
     token = extractToken(responseText);
