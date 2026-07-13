@@ -56,7 +56,6 @@ https://platform.cloud.coveo.com/rest/organizations/<ORG_ID>/commerce/v2
 | `coveoCommerceSearchTokenSecurityProvider` | Security identity provider used when minting search tokens | `Email Security Provider` |
 | `coveoCommerceSearchTokenUserType` | User identity type for minted search tokens | `User` |
 | `coveoCommerceSearchTokenValidityMillis` | Search token lifetime in milliseconds | `3600000` |
-| `coveoCommerceDefaultCatalog` | Default catalog identifier | empty |
 | `coveoCommerceLocale` | Optional fallback locale used when the current storefront request locale is not available | empty |
 | `coveoCommerceLanguage` | Optional fallback language code. Runtime requests use the storefront locale first, then this preference | empty |
 | `coveoCommerceCountry` | Optional fallback country code. Runtime requests use the storefront locale first, then this preference | empty |

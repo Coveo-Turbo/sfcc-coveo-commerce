@@ -83,7 +83,7 @@ server.get('Show', function (req, res, next) {
         });
         res.render('search/searchResults');
     } catch (error) {
-        renderPageError(res, error, 'search');
+        renderPageError(res, error);
     }
 
     return next();

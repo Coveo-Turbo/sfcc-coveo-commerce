@@ -86,14 +86,6 @@
                 <externally-managed-flag>false</externally-managed-flag>
                 <default-value>3600000</default-value>
             </attribute-definition>
-            <attribute-definition attribute-id="coveoCommerceDefaultCatalog">
-                <display-name xml:lang="x-default">Coveo Commerce Default Catalog</display-name>
-                <description xml:lang="x-default">Optional default catalog identifier used by the integration layer.</description>
-                <type>string</type>
-                <localizable-flag>false</localizable-flag>
-                <mandatory-flag>false</mandatory-flag>
-                <externally-managed-flag>false</externally-managed-flag>
-            </attribute-definition>
             <attribute-definition attribute-id="coveoCommerceLocale">
                 <display-name xml:lang="x-default">Coveo Commerce Locale Fallback</display-name>
                 <description xml:lang="x-default">Optional fallback locale, such as fr_CA, used when storefront request locale is not available.</description>
@@ -192,7 +184,6 @@
                 <attribute attribute-id="coveoCommerceSearchTokenSecurityProvider"/>
                 <attribute attribute-id="coveoCommerceSearchTokenUserType"/>
                 <attribute attribute-id="coveoCommerceSearchTokenValidityMillis"/>
-                <attribute attribute-id="coveoCommerceDefaultCatalog"/>
                 <attribute attribute-id="coveoCommerceLocale"/>
                 <attribute attribute-id="coveoCommerceLanguage"/>
                 <attribute attribute-id="coveoCommerceCountry"/>
