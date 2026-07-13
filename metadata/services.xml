@@ -5,6 +5,12 @@
         <user-id/>
         <password masked="true"></password>
     </service-credential>
+    <service-credential service-credential-id="coveo.http.search.token.cred">
+        <url>https://organization-placeholder.org.coveo.com</url>
+        <user-id/>
+        <password masked="true"></password>
+    </service-credential>
+
     <service-profile service-profile-id="coveo.http.commerce.api.profile">
         <timeout-millis>5000</timeout-millis>
         <rate-limit-enabled>false</rate-limit-enabled>
@@ -14,6 +20,16 @@
         <cb-calls>0</cb-calls>
         <cb-millis>0</cb-millis>
     </service-profile>
+    <service-profile service-profile-id="coveo.http.search.token.profile">
+        <timeout-millis>5000</timeout-millis>
+        <rate-limit-enabled>false</rate-limit-enabled>
+        <rate-limit-calls>0</rate-limit-calls>
+        <rate-limit-millis>0</rate-limit-millis>
+        <cb-enabled>true</cb-enabled>
+        <cb-calls>0</cb-calls>
+        <cb-millis>0</cb-millis>
+    </service-profile>
+
     <service service-id="coveo.http.commerce.api">
         <service-type>HTTP</service-type>
         <enabled>true</enabled>
@@ -24,21 +40,6 @@
         <profile-id>coveo.http.commerce.api.profile</profile-id>
         <credential-id>coveo.http.commerce.api.cred</credential-id>
     </service>
-
-    <service-credential service-credential-id="coveo.http.search.token.cred">
-        <url>https://organization-placeholder.org.coveo.com</url>
-        <user-id/>
-        <password masked="true"></password>
-    </service-credential>
-    <service-profile service-profile-id="coveo.http.search.token.profile">
-        <timeout-millis>5000</timeout-millis>
-        <rate-limit-enabled>false</rate-limit-enabled>
-        <rate-limit-calls>0</rate-limit-calls>
-        <rate-limit-millis>0</rate-limit-millis>
-        <cb-enabled>true</cb-enabled>
-        <cb-calls>0</cb-calls>
-        <cb-millis>0</cb-millis>
-    </service-profile>
     <service service-id="coveo.http.search.token">
         <service-type>HTTP</service-type>
         <enabled>true</enabled>
