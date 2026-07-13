@@ -97,6 +97,11 @@ npm run packageMetadata
 
 The metadata packaging step creates `dist/int_coveo_commerce_site_preferences.zip`, which you can import in Business Manager so the `Coveo Commerce` custom site-preference group appears on your target site.
 
+The cartridge now uses SFCC `LocalServiceRegistry` for outbound HTTP calls. Before runtime requests can succeed, create these HTTP services in Business Manager:
+
+- `coveo.http.commerce.api`
+- `coveo.http.search.token`
+
 ## Cartridge Path
 
 Typical generic cartridge path ordering:

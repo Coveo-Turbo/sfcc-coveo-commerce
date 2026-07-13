@@ -64,6 +64,25 @@ After the import completes, switch to the target site and configure the values u
 Merchant Tools -> Site Preferences -> Custom Preferences -> Coveo Commerce
 ```
 
+## Configure SFCC Services
+
+Create these HTTP services in Business Manager:
+
+- `coveo.http.commerce.api`
+- `coveo.http.search.token`
+
+Recommended setup:
+
+- Create an HTTP service profile for each service with the timeout and rate-limiting values you want SFCC to enforce.
+- Use `NONE` for authentication because the cartridge sets Coveo bearer headers at runtime.
+- Point the credential URL at the matching Coveo host, such as `https://platform.cloud.coveo.com` for Commerce API calls and `https://<organization>.org.coveo.com` for search-token calls. The cartridge sets the final request URL at runtime.
+
+Business Manager path:
+
+```text
+Administration -> Operations -> Services
+```
+
 Keep `dw.json` local and out of source control.
 
 ## Next Steps

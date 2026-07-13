@@ -1,40 +1,12 @@
 'use strict';
 
-var SFCCHttpClient = require('dw/net/HTTPClient');
 var AuthenticationService = require('*/cartridge/scripts/services/AuthenticationService');
 var Config = require('*/cartridge/scripts/config/Config');
 var Logger = require('*/cartridge/scripts/helpers/Logger');
+var LocalServiceClient = require('*/cartridge/scripts/services/LocalServiceClient');
 
 function normalizeBoolean(value) {
     return value === true || value === 'true' || value === '1';
-}
-
-function getNow() {
-    return new Date().getTime();
-}
-
-function getStatusCode(httpClient) {
-    if (httpClient.getStatusCode) {
-        return httpClient.getStatusCode();
-    }
-
-    return httpClient.statusCode;
-}
-
-function getText(httpClient) {
-    if (httpClient.getText) {
-        return httpClient.getText();
-    }
-
-    return httpClient.text;
-}
-
-function getHeaders(httpClient) {
-    if (!httpClient.getAllResponseHeaders) {
-        return {};
-    }
-
-    return httpClient.getAllResponseHeaders();
 }
 
 function parseBody(rawBody, parseJson) {
@@ -366,39 +338,6 @@ function isRetryable(error) {
     return error.retryable === true;
 }
 
-function send(method, url, headers, body, timeoutMillis) {
-    var httpClient = new SFCCHttpClient();
-    var start = getNow();
-    var statusCode;
-    var rawBody;
-    var response;
-
-    httpClient.open(method, url);
-    httpClient.setTimeout(timeoutMillis);
-
-    Object.keys(headers).forEach(function (headerName) {
-        httpClient.setRequestHeader(headerName, headers[headerName]);
-    });
-
-    if (body) {
-        httpClient.send(body);
-    } else {
-        httpClient.send();
-    }
-
-    statusCode = getStatusCode(httpClient);
-    rawBody = getText(httpClient);
-    response = {
-        statusCode: statusCode,
-        ok: statusCode >= 200 && statusCode < 300,
-        body: rawBody,
-        headers: getHeaders(httpClient),
-        duration: getNow() - start
-    };
-
-    return response;
-}
-
 function request(options) {
     var settings = Config.getSettings();
     var requestOptions = options || {};
@@ -418,10 +357,6 @@ function request(options) {
     var responseDebugSummary;
     var failureDebugSummary;
 
-    if (payload && typeof payload !== 'string') {
-        payload = JSON.stringify(payload);
-    }
-
     if (debugEnabled) {
         requestDebugSummary = buildRequestDebugSummary(
             operationName,
@@ -440,7 +375,14 @@ function request(options) {
 
     for (attempt = 1; attempt <= maxAttempts; attempt += 1) {
         try {
-            response = send(method, requestOptions.url, headers, payload, timeoutMillis);
+            response = LocalServiceClient.call(Config.SERVICE_IDS.COMMERCE_API, {
+                name: operationName,
+                method: method,
+                url: requestOptions.url,
+                headers: headers,
+                body: payload,
+                timeout: timeoutMillis
+            });
             response.data = parseBody(response.body, requestOptions.parseJson !== false);
 
             if (!response.ok) {

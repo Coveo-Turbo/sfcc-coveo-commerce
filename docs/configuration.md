@@ -16,6 +16,21 @@ npm run packageMetadata
 
 Create these custom preferences in Business Manager or define them through your normal SFCC metadata import flow before enabling the cartridge on a site.
 
+## Required SFCC Services
+
+`int_coveo_commerce` now sends outbound requests through SFCC `dw/svc/LocalServiceRegistry`. Create these HTTP services in Business Manager before enabling the cartridge:
+
+| Service ID | Purpose |
+| --- | --- |
+| `coveo.http.commerce.api` | Commerce API search, listing, suggestion, and recommendation calls |
+| `coveo.http.search.token` | Server-side search-token generation |
+
+Service notes:
+
+- Configure authentication as `NONE`; the cartridge adds bearer headers itself.
+- Set the credential URL to the matching Coveo host. The cartridge overrides the full request URL at runtime.
+- Prefer managing timeout, rate limiting, and circuit-breaker behavior in the service profile so SFCC owns the outbound-call policy.
+
 ## Required Preferences
 
 | Preference ID | Purpose |

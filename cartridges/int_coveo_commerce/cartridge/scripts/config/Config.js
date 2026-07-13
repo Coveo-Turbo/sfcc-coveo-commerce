@@ -12,6 +12,11 @@ var AUTH_MODES = {
     SEARCH_TOKEN: 'searchToken'
 };
 
+var SERVICE_IDS = {
+    COMMERCE_API: 'coveo.http.commerce.api',
+    SEARCH_TOKEN: 'coveo.http.search.token'
+};
+
 var PREFERENCES = {
     ORGANIZATION_ID: 'coveoCommerceOrganizationId',
     API_ENDPOINT: 'coveoCommerceApiEndpoint',
@@ -177,6 +182,7 @@ function validateSettings(settings) {
 
 module.exports = {
     AUTH_MODES: AUTH_MODES,
+    SERVICE_IDS: SERVICE_IDS,
     PREFERENCES: PREFERENCES,
     getSettings: getSettings,
     getRequiredPreferenceIds: getRequiredPreferenceIds,
