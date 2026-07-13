@@ -2,7 +2,6 @@
 
 var Site = require('dw/system/Site');
 
-var DEFAULT_TIMEOUT_MILLIS = 5000;
 var DEFAULT_RETRY_COUNT = 1;
 var DEFAULT_SEARCH_TOKEN_VALIDITY_MILLIS = 3600000;
 var DEFAULT_SEARCH_TOKEN_SECURITY_PROVIDER = 'Email Security Provider';
@@ -36,7 +35,6 @@ var PREFERENCES = {
     PIPELINE: 'coveoCommercePipeline',
     ANALYTICS_ENABLED: 'coveoCommerceAnalyticsEnabled',
     VERBOSE_LOGGING: 'coveoCommerceVerboseLogging',
-    TIMEOUT_MILLIS: 'coveoCommerceTimeoutMillis',
     RETRY_COUNT: 'coveoCommerceRetryCount'
 };
 
@@ -124,7 +122,6 @@ function getSettings() {
         pipeline: getPreferenceValue(site, PREFERENCES.PIPELINE, ''),
         analyticsEnabled: normalizeBoolean(getPreferenceValue(site, PREFERENCES.ANALYTICS_ENABLED, true), true),
         verboseLogging: normalizeBoolean(getPreferenceValue(site, PREFERENCES.VERBOSE_LOGGING, false), false),
-        timeoutMillis: normalizeNumber(getPreferenceValue(site, PREFERENCES.TIMEOUT_MILLIS, DEFAULT_TIMEOUT_MILLIS), DEFAULT_TIMEOUT_MILLIS),
         retryCount: normalizeNumber(getPreferenceValue(site, PREFERENCES.RETRY_COUNT, DEFAULT_RETRY_COUNT), DEFAULT_RETRY_COUNT)
     };
 }
@@ -137,24 +134,8 @@ function validateSettings(settings) {
         missing.push(PREFERENCES.ORGANIZATION_ID);
     }
 
-    if (!config.apiEndpoint) {
-        missing.push(PREFERENCES.API_ENDPOINT);
-    }
-
     if (!config.trackingId) {
         missing.push(PREFERENCES.TRACKING_ID);
-    }
-
-    if (config.authMode === AUTH_MODES.SEARCH_TOKEN) {
-        if (!config.authenticatedSearchApiKey) {
-            missing.push(PREFERENCES.AUTHENTICATED_SEARCH_API_KEY);
-        }
-
-        return missing;
-    }
-
-    if (!config.apiToken) {
-        missing.push(PREFERENCES.API_TOKEN);
     }
 
     return missing;

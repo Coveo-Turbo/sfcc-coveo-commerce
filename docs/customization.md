@@ -7,7 +7,8 @@ The cartridge is designed to be overridden from a custom storefront cartridge pl
 - `controllers/Search.js`
 - `controllers/Category.js`
 - `scripts/services/CommerceApiService.js`
-- `scripts/services/AuthenticationService.js`
+- `scripts/services/CoveoCommerceHttpService.js`
+- `scripts/services/CoveoSearchTokenHttpService.js`
 - `scripts/services/AnalyticsService.js`
 - `scripts/services/SearchTokenService.js`
 - `scripts/mappers/ProductMapper.js`

@@ -76,7 +76,9 @@ Recommended setup:
 
 - Review the imported service profile and credential settings, and adjust them if your instance needs different timeout, rate limiting, or circuit-breaker values.
 - Use `NONE` for authentication because the cartridge sets Coveo bearer headers at runtime.
-- The imported credential URLs are starter values. You can keep them as-is because the cartridge overrides the final request URL at runtime, or align them to your target Coveo hosts for clarity.
+- Set the `coveo.http.commerce.api` credential URL to your Coveo platform host, such as `https://platform.cloud.coveo.com`, and store the Commerce API token in that credential password when using `apiKey` mode.
+- Set the `coveo.http.search.token` credential URL to your organization token host, such as `https://<org>.org.coveo.com`, and store the authenticated search API key in that credential password when using `searchToken` mode.
+- The legacy site preferences for API endpoint and secret values remain as code fallbacks, but the preferred configuration now lives in the SFCC service credentials and profiles.
 
 Business Manager path:
 

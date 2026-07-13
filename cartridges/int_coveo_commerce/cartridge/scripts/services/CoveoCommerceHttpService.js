@@ -1,9 +1,13 @@
 'use strict';
 
-var AuthenticationService = require('*/cartridge/scripts/services/AuthenticationService');
+var LocalServiceRegistry = require('dw/svc/LocalServiceRegistry');
 var Config = require('*/cartridge/scripts/config/Config');
 var Logger = require('*/cartridge/scripts/helpers/Logger');
-var LocalServiceClient = require('*/cartridge/scripts/services/LocalServiceClient');
+var SearchTokenService = require('*/cartridge/scripts/services/SearchTokenService');
+var ServiceSupport = require('*/cartridge/scripts/services/CoveoServiceSupport');
+var UrlHelper = require('*/cartridge/scripts/helpers/UrlHelper');
+
+var AUTH_MODES = Config.AUTH_MODES;
 
 function normalizeBoolean(value) {
     return value === true || value === 'true' || value === '1';
@@ -76,13 +80,12 @@ function summarizeContext(context) {
     };
 }
 
-function buildRequestDebugSummary(operationName, method, url, payload) {
+function buildRequestDebugSummary(operationName, endpointPath, payload) {
     var source = parseJsonSafely(payload, {});
     var facets = summarizeFacets(source.facets);
     var summary = {
         operation: operationName,
-        method: method,
-        url: url,
+        endpoint: endpointPath,
         trackingId: source.trackingId || '',
         clientId: source.clientId || '',
         language: source.language || '',
@@ -145,6 +148,8 @@ function buildResponseDebugSummary(operationName, response, attempt) {
         suggestions = source.suggestions;
     } else if (source && source.items) {
         suggestions = source.items;
+    } else if (source && source.completions) {
+        suggestions = source.completions;
     }
 
     if (source && source.facets) {
@@ -165,6 +170,8 @@ function buildResponseDebugSummary(operationName, response, attempt) {
         summary.total = pagination.total;
     } else if (pagination && typeof pagination.totalCount !== 'undefined') {
         summary.total = pagination.totalCount;
+    } else if (pagination && typeof pagination.totalEntries !== 'undefined') {
+        summary.total = pagination.totalEntries;
     }
 
     if (products && typeof products.length === 'number') {
@@ -225,14 +232,157 @@ function isRetryable(error) {
     return error.retryable === true;
 }
 
+function getCommerceApiBaseUrl(service, settings) {
+    var config = settings || {};
+    var configuredUrl = ServiceSupport.getCredentialURL(service) || config.apiEndpoint;
+
+    if (!configuredUrl) {
+        throw new Error('Missing Coveo Commerce service credential URL.');
+    }
+
+    if (configuredUrl.indexOf('/commerce/') !== -1) {
+        return configuredUrl;
+    }
+
+    return UrlHelper.buildEndpoint(
+        configuredUrl,
+        'rest/organizations/' + config.organizationId + '/commerce/v2'
+    );
+}
+
+function getAccessToken(service, settings, authContext) {
+    var config = settings || {};
+
+    if (config.authMode === AUTH_MODES.SEARCH_TOKEN) {
+        return SearchTokenService.requestSearchToken(authContext || {}, config);
+    }
+
+    return ServiceSupport.getCredentialPassword(service) || config.apiToken || '';
+}
+
+function buildMockPayload(endpointPath) {
+    switch (endpointPath) {
+    case 'search/querySuggest':
+        return {
+            completions: [],
+            responseId: 'mock-response-id',
+            queryUid: 'mock-query-uid'
+        };
+    case 'search/productSuggest':
+        return {
+            items: [],
+            responseId: 'mock-response-id',
+            queryUid: 'mock-query-uid'
+        };
+    case 'recommendations':
+        return {
+            recommendations: [],
+            responseId: 'mock-response-id'
+        };
+    case 'listing':
+        return {
+            products: [],
+            facets: [],
+            pagination: {
+                page: 1,
+                perPage: 0,
+                totalEntries: 0,
+                totalPages: 0
+            },
+            responseId: 'mock-response-id'
+        };
+    default:
+        return {
+            products: [],
+            facets: [],
+            pagination: {
+                page: 1,
+                perPage: 0,
+                totalEntries: 0,
+                totalPages: 0
+            },
+            responseId: 'mock-response-id',
+            queryUid: 'mock-query-uid'
+        };
+    }
+}
+
+function createService() {
+    return LocalServiceRegistry.createService(Config.SERVICE_IDS.COMMERCE_API, {
+        createRequest: function (service, requestData) {
+            var data = requestData || {};
+            var settings = data.settings || {};
+            var accessToken = getAccessToken(service, settings, data.authContext);
+
+            if (!accessToken) {
+                throw new Error('Missing Coveo Commerce API bearer token on the commerce service credential.');
+            }
+
+            service.setAuthentication('NONE');
+            service.setRequestMethod('POST');
+            service.setURL(
+                UrlHelper.buildEndpoint(
+                    getCommerceApiBaseUrl(service, settings),
+                    data.endpointPath || ''
+                )
+            );
+            service.setEncoding('UTF-8');
+            service.addHeader('Accept', 'application/json');
+            service.addHeader('Content-Type', 'application/json');
+            service.addHeader('Authorization', 'Bearer ' + accessToken);
+
+            return ServiceSupport.normalizeBody(data.payload);
+        },
+        parseResponse: function (service, httpClient) {
+            return ServiceSupport.buildResponseFromClient(httpClient, 0);
+        },
+        getRequestLogMessage: function (requestData) {
+            var data = requestData || {};
+
+            return ServiceSupport.sanitizeLogValue('POST ' + (data.endpointPath || ''), 512);
+        },
+        getResponseLogMessage: function (responseData) {
+            return ServiceSupport.buildStatusLogMessage(responseData);
+        },
+        filterLogMessage: function (message) {
+            return ServiceSupport.filterLogMessage(message);
+        },
+        mockCall: function (service, requestData) {
+            var data = requestData || {};
+
+            return {
+                statusCode: 200,
+                statusMessage: 'Success',
+                text: JSON.stringify(buildMockPayload(data.endpointPath || ''))
+            };
+        }
+    });
+}
+
+function call(requestOptions) {
+    var options = requestOptions || {};
+    var service = createService();
+    var startedAt = ServiceSupport.getNow();
+    var result = service.call({
+        endpointPath: options.endpointPath,
+        payload: options.body,
+        authContext: options.authContext,
+        settings: options.settings
+    });
+
+    return ServiceSupport.createServiceResult(
+        Config.SERVICE_IDS.COMMERCE_API,
+        options.name || options.endpointPath || 'request',
+        result,
+        service,
+        startedAt
+    );
+}
+
 function request(options) {
-    var settings = Config.getSettings();
+    var settings = (options && options.settings) || Config.getSettings();
     var requestOptions = options || {};
-    var method = (requestOptions.method || 'GET').toUpperCase();
-    var operationName = requestOptions.name || requestOptions.url || 'request';
-    var headers = AuthenticationService.buildHeaders(requestOptions.headers || {}, settings, requestOptions.authContext);
-    var payload = requestOptions.body;
-    var timeoutMillis = requestOptions.timeout || settings.timeoutMillis;
+    var operationName = requestOptions.name || requestOptions.endpointPath || 'request';
     var retryCount = typeof requestOptions.retryCount === 'number' ? requestOptions.retryCount : settings.retryCount;
     var maxAttempts = Math.max(1, retryCount + 1);
     var debugEnabled = isCoveoDebugEnabled(requestOptions.authContext);
@@ -246,8 +396,7 @@ function request(options) {
     if (debugEnabled) {
         requestDebugSummary = buildRequestDebugSummary(
             operationName,
-            method,
-            requestOptions.url,
+            requestOptions.endpointPath,
             requestOptions.body
         );
         Logger.warn('Coveo Commerce debug request.', requestDebugSummary);
@@ -255,13 +404,12 @@ function request(options) {
 
     for (attempt = 1; attempt <= maxAttempts; attempt += 1) {
         try {
-            response = LocalServiceClient.call(Config.SERVICE_IDS.COMMERCE_API, {
+            response = call({
                 name: operationName,
-                method: method,
-                url: requestOptions.url,
-                headers: headers,
-                body: payload,
-                timeout: timeoutMillis
+                endpointPath: requestOptions.endpointPath,
+                body: requestOptions.body,
+                authContext: requestOptions.authContext,
+                settings: settings
             });
             response.data = parseBody(response.body, requestOptions.parseJson !== false);
 

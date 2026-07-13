@@ -51,16 +51,17 @@ cartridges/
           SortMapper.js
         services/
           AnalyticsService.js
-          AuthenticationService.js
           CommerceApiService.js
-          HttpClient.js
+          CoveoCommerceHttpService.js
+          CoveoSearchTokenHttpService.js
+          CoveoServiceSupport.js
           SearchTokenService.js
 ```
 
 ## Responsibilities
 
 - Coveo Commerce API integration
-- Direct API-key bearer authentication
+- Direct API-key bearer authentication through SFCC service credentials
 - Server-side search-token authentication
 - Search and category listing service wrappers
 - Query suggest, product suggest, and recommendations wrappers
@@ -97,7 +98,7 @@ npm run packageMetadata
 
 The metadata packaging step creates `dist/int_coveo_commerce_site_preferences.zip`, which you can import in Business Manager so the `Coveo Commerce` custom site-preference group and the starter service definitions appear on your target instance.
 
-The cartridge now uses SFCC `LocalServiceRegistry` for outbound HTTP calls. The metadata package includes these HTTP services:
+The cartridge now uses concrete SFCC `LocalServiceRegistry` services for outbound HTTP calls. The metadata package includes these HTTP services:
 
 - `coveo.http.commerce.api`
 - `coveo.http.search.token`

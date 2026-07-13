@@ -3,7 +3,7 @@
 
 var Config = require('*/cartridge/scripts/config/Config');
 var Logger = require('*/cartridge/scripts/helpers/Logger');
-var LocalServiceClient = require('*/cartridge/scripts/services/LocalServiceClient');
+var CoveoSearchTokenHttpService = require('*/cartridge/scripts/services/CoveoSearchTokenHttpService');
 var TOKEN_CACHE_KEY = 'coveoCommerceSearchTokenCache';
 var TOKEN_CACHE_SAFETY_WINDOW_MILLIS = 5000;
 
@@ -336,14 +336,6 @@ function buildTokenRequestBody(context, settings) {
     return body;
 }
 
-function getSearchTokenEndpoint(settings) {
-    if (settings.searchTokenServiceUrl) {
-        return settings.searchTokenServiceUrl;
-    }
-
-    return 'https://' + settings.organizationId + '.org.coveo.com/rest/search/token';
-}
-
 function extractToken(rawResponse) {
     var responseText = String(rawResponse || '').replace(/^\s+|\s+$/g, '');
     var parsed;
@@ -363,9 +355,9 @@ function extractToken(rawResponse) {
 
 function requestSearchToken(context, settings) {
     var config = settings || Config.getSettings();
-    var endpoint = getSearchTokenEndpoint(config);
     var payload = buildTokenRequestBody(context || {}, config);
-    var cacheKey = buildCacheKey(endpoint, payload);
+    var cacheScope = config.searchTokenServiceUrl || config.organizationId || Config.SERVICE_IDS.SEARCH_TOKEN;
+    var cacheKey = buildCacheKey(cacheScope, payload);
     var cachedToken = readCachedToken(context, cacheKey);
     var response;
     var responseText;
@@ -373,28 +365,19 @@ function requestSearchToken(context, settings) {
 
     if (cachedToken) {
         Logger.debug('Reusing cached Coveo search token.', {
-            endpoint: endpoint
+            organizationId: config.organizationId,
+            serviceId: Config.SERVICE_IDS.SEARCH_TOKEN
         });
 
         return cachedToken;
     }
 
     try {
-        response = LocalServiceClient.call(Config.SERVICE_IDS.SEARCH_TOKEN, {
-            name: 'searchToken',
-            method: 'POST',
-            url: endpoint,
-            headers: {
-                Authorization: 'Bearer ' + config.authenticatedSearchApiKey,
-                Accept: 'text/plain, application/json',
-                'Content-Type': 'application/json'
-            },
-            body: payload,
-            timeout: config.timeoutMillis
-        });
+        response = CoveoSearchTokenHttpService.request(payload, config);
     } catch (error) {
         Logger.error('Coveo search token request failed.', {
-            endpoint: endpoint,
+            organizationId: config.organizationId,
+            serviceId: Config.SERVICE_IDS.SEARCH_TOKEN,
             message: error.message,
             statusCode: error.statusCode || null,
             serviceStatus: error.serviceStatus || null,
@@ -408,8 +391,9 @@ function requestSearchToken(context, settings) {
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
         Logger.error('Coveo search token request failed.', {
-            statusCode: response.statusCode,
-            endpoint: endpoint
+            organizationId: config.organizationId,
+            serviceId: Config.SERVICE_IDS.SEARCH_TOKEN,
+            statusCode: response.statusCode
         });
 
         throw new Error('Unable to retrieve a Coveo search token. Status: ' + response.statusCode + '.');
@@ -424,7 +408,8 @@ function requestSearchToken(context, settings) {
     cacheToken(context, cacheKey, token, payload.validFor);
 
     Logger.info('Coveo search token generated.', {
-        endpoint: endpoint,
+        organizationId: config.organizationId,
+        serviceId: Config.SERVICE_IDS.SEARCH_TOKEN,
         validFor: payload.validFor
     });
 
