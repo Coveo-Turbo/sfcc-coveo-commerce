@@ -10,22 +10,6 @@
                 <mandatory-flag>false</mandatory-flag>
                 <externally-managed-flag>false</externally-managed-flag>
             </attribute-definition>
-            <attribute-definition attribute-id="coveoCommerceApiEndpoint">
-                <display-name xml:lang="x-default">Coveo Commerce API Endpoint</display-name>
-                <description xml:lang="x-default">Base endpoint for Commerce API requests, for example https://platform.cloud.coveo.com/rest/organizations/&lt;ORG_ID&gt;/commerce/v2.</description>
-                <type>string</type>
-                <localizable-flag>false</localizable-flag>
-                <mandatory-flag>false</mandatory-flag>
-                <externally-managed-flag>false</externally-managed-flag>
-            </attribute-definition>
-            <attribute-definition attribute-id="coveoCommerceApiToken">
-                <display-name xml:lang="x-default">Coveo Commerce API Token</display-name>
-                <description xml:lang="x-default">Shared bearer token used when the cartridge runs in apiKey authentication mode.</description>
-                <type>string</type>
-                <localizable-flag>false</localizable-flag>
-                <mandatory-flag>false</mandatory-flag>
-                <externally-managed-flag>false</externally-managed-flag>
-            </attribute-definition>
             <attribute-definition attribute-id="coveoCommerceTrackingId">
                 <display-name xml:lang="x-default">Coveo Commerce Tracking ID</display-name>
                 <description xml:lang="x-default">Tracking ID associated with the storefront experience in Coveo Commerce.</description>
@@ -42,22 +26,6 @@
                 <mandatory-flag>false</mandatory-flag>
                 <externally-managed-flag>false</externally-managed-flag>
                 <default-value>apiKey</default-value>
-            </attribute-definition>
-            <attribute-definition attribute-id="coveoCommerceAuthenticatedSearchApiKey">
-                <display-name xml:lang="x-default">Coveo Authenticated Search API Key</display-name>
-                <description xml:lang="x-default">Private API key used server-side to mint Coveo search tokens when the cartridge runs in searchToken mode.</description>
-                <type>string</type>
-                <localizable-flag>false</localizable-flag>
-                <mandatory-flag>false</mandatory-flag>
-                <externally-managed-flag>false</externally-managed-flag>
-            </attribute-definition>
-            <attribute-definition attribute-id="coveoCommerceSearchTokenServiceUrl">
-                <display-name xml:lang="x-default">Coveo Search Token Service URL</display-name>
-                <description xml:lang="x-default">Optional override for the search token endpoint. Leave empty to use the default Coveo token URL for the configured organization.</description>
-                <type>string</type>
-                <localizable-flag>false</localizable-flag>
-                <mandatory-flag>false</mandatory-flag>
-                <externally-managed-flag>false</externally-managed-flag>
             </attribute-definition>
             <attribute-definition attribute-id="coveoCommerceSearchTokenSecurityProvider">
                 <display-name xml:lang="x-default">Coveo Search Token Security Provider</display-name>
@@ -152,15 +120,6 @@
                 <externally-managed-flag>false</externally-managed-flag>
                 <default-value>false</default-value>
             </attribute-definition>
-            <attribute-definition attribute-id="coveoCommerceTimeoutMillis">
-                <display-name xml:lang="x-default">Coveo Commerce Timeout Millis</display-name>
-                <description xml:lang="x-default">HTTP timeout in milliseconds for Commerce API calls.</description>
-                <type>int</type>
-                <localizable-flag>false</localizable-flag>
-                <mandatory-flag>false</mandatory-flag>
-                <externally-managed-flag>false</externally-managed-flag>
-                <default-value>5000</default-value>
-            </attribute-definition>
             <attribute-definition attribute-id="coveoCommerceRetryCount">
                 <display-name xml:lang="x-default">Coveo Commerce Retry Count</display-name>
                 <description xml:lang="x-default">Retry count for retryable Commerce API failures.</description>
@@ -175,12 +134,8 @@
             <attribute-group group-id="CoveoCommerce">
                 <display-name xml:lang="x-default">Coveo Commerce</display-name>
                 <attribute attribute-id="coveoCommerceOrganizationId"/>
-                <attribute attribute-id="coveoCommerceApiEndpoint"/>
-                <attribute attribute-id="coveoCommerceApiToken"/>
                 <attribute attribute-id="coveoCommerceTrackingId"/>
                 <attribute attribute-id="coveoCommerceAuthMode"/>
-                <attribute attribute-id="coveoCommerceAuthenticatedSearchApiKey"/>
-                <attribute attribute-id="coveoCommerceSearchTokenServiceUrl"/>
                 <attribute attribute-id="coveoCommerceSearchTokenSecurityProvider"/>
                 <attribute attribute-id="coveoCommerceSearchTokenUserType"/>
                 <attribute attribute-id="coveoCommerceSearchTokenValidityMillis"/>
@@ -192,7 +147,6 @@
                 <attribute attribute-id="coveoCommercePipeline"/>
                 <attribute attribute-id="coveoCommerceAnalyticsEnabled"/>
                 <attribute attribute-id="coveoCommerceVerboseLogging"/>
-                <attribute attribute-id="coveoCommerceTimeoutMillis"/>
                 <attribute attribute-id="coveoCommerceRetryCount"/>
             </attribute-group>
         </group-definitions>

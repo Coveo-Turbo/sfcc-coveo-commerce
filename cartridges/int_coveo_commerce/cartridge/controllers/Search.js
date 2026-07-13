@@ -1,26 +1,11 @@
 'use strict';
+/* global request, response */
 
 var server = require('server');
 var CommerceApiService = require('*/cartridge/scripts/services/CommerceApiService');
 var SearchResult = require('*/cartridge/models/SearchResult');
 var GtmHelper = require('*/cartridge/scripts/helpers/GtmHelper');
 var Logger = require('*/cartridge/scripts/helpers/Logger');
-
-function getHttpRequest() {
-    if (typeof request !== 'undefined') {
-        return request;
-    }
-
-    return null;
-}
-
-function getHttpResponse() {
-    if (typeof response !== 'undefined') {
-        return response;
-    }
-
-    return null;
-}
 
 function buildParams(req) {
     var query = req.querystring || {};
@@ -32,21 +17,10 @@ function buildParams(req) {
 
     params.currentCustomer = req.currentCustomer;
     params.session = req.session;
-    params.request = getHttpRequest();
-    params.response = getHttpResponse();
+    params.request = request;
+    params.response = response;
 
     return params;
-}
-
-function setStatus(res, statusCode) {
-    if (res.setStatusCode) {
-        res.setStatusCode(statusCode);
-        return;
-    }
-
-    if (getHttpResponse() && getHttpResponse().setStatus) {
-        getHttpResponse().setStatus(statusCode);
-    }
 }
 
 function renderPageError(res, error) {
@@ -55,7 +29,7 @@ function renderPageError(res, error) {
         stack: error.stack
     });
 
-    setStatus(res, 502);
+    res.setStatusCode(502);
     res.setViewData({
         coveoSearch: new SearchResult(),
         coveoError: {
@@ -111,7 +85,7 @@ server.get('Suggest', function (req, res, next) {
             message: error.message
         });
 
-        setStatus(res, 502);
+        res.setStatusCode(502);
         res.json({
             error: true,
             message: 'Unable to retrieve Coveo query suggestions.'
@@ -143,7 +117,7 @@ server.get('ProductSuggestions', function (req, res, next) {
             message: error.message
         });
 
-        setStatus(res, 502);
+        res.setStatusCode(502);
         res.json({
             error: true,
             message: 'Unable to retrieve Coveo product suggestions.'
@@ -175,7 +149,7 @@ server.get('Recommendations', function (req, res, next) {
             message: error.message
         });
 
-        setStatus(res, 502);
+        res.setStatusCode(502);
         res.json({
             error: true,
             message: 'Unable to retrieve Coveo recommendations.'

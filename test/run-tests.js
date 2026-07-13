@@ -215,97 +215,16 @@ test('SortMapper supports nested listing sort payloads', function () {
     assert.strictEqual(mapped.options[1].id, 'fields:ec_price:asc');
 });
 
-test('AuthenticationService uses direct API token in apiKey mode', function () {
-    var AuthenticationService = loadModule(
-        path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/services/AuthenticationService.js'),
-        {
-            '*/cartridge/scripts/config/Config': {
-                AUTH_MODES: {
-                    API_KEY: 'apiKey',
-                    SEARCH_TOKEN: 'searchToken'
-                },
-                getSettings: function () {
-                    return {};
-                }
-            },
-            '*/cartridge/scripts/services/SearchTokenService': {
-                requestSearchToken: function () {
-                    throw new Error('Search token flow should not be used in apiKey mode.');
-                }
-            }
-        }
-    );
-    var headers = AuthenticationService.buildHeaders({
-        Accept: 'application/json'
-    }, {
-        authMode: 'apiKey',
-        apiToken: 'api-token-1'
-    });
-
-    assert.strictEqual(headers.Accept, 'application/json');
-    assert.strictEqual(headers.Authorization, 'Bearer api-token-1');
-});
-
-test('AuthenticationService uses SearchTokenService in searchToken mode', function () {
-    var SearchTokenService = {
-        requestSearchToken: function (authContext, settings) {
-            assert.strictEqual(authContext.currentCustomer.profile.email, 'shopper@example.com');
-            assert.strictEqual(settings.authMode, 'searchToken');
-            return 'search-token-1';
-        }
-    };
-    var AuthenticationService = loadModule(
-        path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/services/AuthenticationService.js'),
-        {
-            '*/cartridge/scripts/config/Config': {
-                AUTH_MODES: {
-                    API_KEY: 'apiKey',
-                    SEARCH_TOKEN: 'searchToken'
-                },
-                getSettings: function () {
-                    return {};
-                }
-            },
-            '*/cartridge/scripts/services/SearchTokenService': SearchTokenService
-        }
-    );
-    var headers = AuthenticationService.buildHeaders({}, {
-        authMode: 'searchToken'
-    }, {
-        currentCustomer: {
-            profile: {
-                email: 'shopper@example.com'
-            }
-        }
-    });
-
-    assert.strictEqual(headers.Authorization, 'Bearer search-token-1');
-});
-
 test('SearchTokenService caches generated search tokens by shopper identity', function () {
     var callCount = 0;
     var SearchTokenService = loadModule(
         path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/services/SearchTokenService.js'),
         {
-            'dw/crypto/Encoding': {
-                toBase64: function (value) {
-                    return Buffer.from(value, 'utf8').toString('base64');
-                }
-            },
-            'dw/crypto/MessageDigest': function () {
-                this.updateBytes = function (value) {
-                    this.value = value;
-                };
-                this.digest = function () {
-                    return Buffer.from(this.value, 'utf8').toString('hex');
-                };
-            },
-            '*/cartridge/scripts/services/LocalServiceClient': {
-                call: function (serviceId, options) {
+            '*/cartridge/scripts/services/CoveoSearchTokenHttpService': {
+                request: function (payload, settings) {
                     callCount += 1;
-                    assert.strictEqual(serviceId, 'coveo.http.search.token');
-                    assert.strictEqual(options.method, 'POST');
-                    assert.strictEqual(options.headers.Authorization, 'Bearer private-key-1');
+                    assert.strictEqual(settings.organizationId, 'org-1');
+                    assert.strictEqual(payload.userIds[0].name, 'shopper@example.com');
 
                     return {
                         statusCode: 200,
@@ -333,7 +252,6 @@ test('SearchTokenService caches generated search tokens by shopper identity', fu
     );
     var settings = {
         organizationId: 'org-1',
-        authenticatedSearchApiKey: 'private-key-1',
         searchTokenValidityMillis: 3600000,
         searchTokenSecurityProvider: 'Email Security Provider',
         searchTokenUserType: 'User'
@@ -354,26 +272,19 @@ test('SearchTokenService caches generated search tokens by shopper identity', fu
     assert.strictEqual(callCount, 1);
 });
 
-test('LocalServiceClient uses LocalServiceRegistry to build HTTP requests', function () {
+test('CoveoSearchTokenHttpService uses LocalServiceRegistry credentials', function () {
     var capturedServiceId = '';
-    var capturedMethod = '';
     var capturedUrl = '';
     var capturedHeaders = {};
     var capturedPayload = '';
-    var capturedTimeout = 0;
-    var LocalServiceClient = loadModule(
-        path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/services/LocalServiceClient.js'),
+    var SearchTokenHttpService = loadModule(
+        path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/services/CoveoSearchTokenHttpService.js'),
         {
             'dw/svc/LocalServiceRegistry': {
                 createService: function (serviceId, callbacks) {
                     var client = {
                         statusCode: 200,
                         text: '{"token":"service-token"}',
-                        timeout: 0,
-                        setTimeout: function (value) {
-                            this.timeout = value;
-                            capturedTimeout = value;
-                        },
                         getAllResponseHeaders: function () {
                             return {
                                 'Content-Type': 'application/json'
@@ -385,15 +296,27 @@ test('LocalServiceClient uses LocalServiceRegistry to build HTTP requests', func
 
                     return {
                         setAuthentication: function () {},
-                        setRequestMethod: function (value) {
-                            capturedMethod = value;
-                        },
+                        setRequestMethod: function () {},
                         setURL: function (value) {
                             capturedUrl = value;
                         },
                         setEncoding: function () {},
                         addHeader: function (name, value) {
                             capturedHeaders[name] = value;
+                        },
+                        getConfiguration: function () {
+                            return {
+                                getCredential: function () {
+                                    return {
+                                        getURL: function () {
+                                            return 'https://org-1.org.coveo.com';
+                                        },
+                                        getPassword: function () {
+                                            return 'private-key-1';
+                                        }
+                                    };
+                                }
+                            };
                         },
                         getClient: function () {
                             return client;
@@ -408,35 +331,278 @@ test('LocalServiceClient uses LocalServiceRegistry to build HTTP requests', func
                         }
                     };
                 }
+            },
+            '*/cartridge/scripts/config/Config': {
+                SERVICE_IDS: {
+                    SEARCH_TOKEN: 'coveo.http.search.token'
+                },
+                getSettings: function () {
+                    return {};
+                }
+            },
+            '*/cartridge/scripts/services/CoveoServiceSupport': loadModule(
+                path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/services/CoveoServiceSupport.js'),
+                {}
+            ),
+            '*/cartridge/scripts/helpers/UrlHelper': {
+                buildEndpoint: function (baseUrl, endpointPath) {
+                    return baseUrl.replace(/\/+$/, '') + '/' + endpointPath;
+                }
             }
         }
     );
-    var response = LocalServiceClient.call('coveo.http.commerce.api', {
+    var response = SearchTokenHttpService.request({
+        userIds: [{
+            name: 'shopper@example.com'
+        }]
+    }, {
+        organizationId: 'org-1'
+    });
+
+    assert.strictEqual(capturedServiceId, 'coveo.http.search.token');
+    assert.strictEqual(capturedUrl, 'https://org-1.org.coveo.com/rest/search/token');
+    assert.strictEqual(capturedHeaders.Authorization, 'Bearer private-key-1');
+    assert.strictEqual(capturedHeaders.Accept, 'text/plain, application/json');
+    assert.strictEqual(capturedHeaders['Content-Type'], 'application/json');
+    assert.strictEqual(capturedPayload, JSON.stringify({
+        userIds: [{
+            name: 'shopper@example.com'
+        }]
+    }));
+    assert.strictEqual(response.statusCode, 200);
+    assert.strictEqual(response.ok, true);
+    assert.strictEqual(response.body, '{"token":"service-token"}');
+});
+
+test('CoveoCommerceHttpService uses service credentials in apiKey mode', function () {
+    var capturedServiceId = '';
+    var capturedUrl = '';
+    var capturedHeaders = {};
+    var capturedPayload = '';
+    var CommerceHttpService = loadModule(
+        path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/services/CoveoCommerceHttpService.js'),
+        {
+            'dw/svc/LocalServiceRegistry': {
+                createService: function (serviceId, callbacks) {
+                    var client = {
+                        statusCode: 200,
+                        text: '{"responseId":"response-1"}',
+                        getAllResponseHeaders: function () {
+                            return {
+                                'Content-Type': 'application/json'
+                            };
+                        }
+                    };
+
+                    capturedServiceId = serviceId;
+
+                    return {
+                        setAuthentication: function () {},
+                        setRequestMethod: function () {},
+                        setURL: function (value) {
+                            capturedUrl = value;
+                        },
+                        setEncoding: function () {},
+                        addHeader: function (name, value) {
+                            capturedHeaders[name] = value;
+                        },
+                        getConfiguration: function () {
+                            return {
+                                getCredential: function () {
+                                    return {
+                                        getURL: function () {
+                                            return 'https://platform.cloud.coveo.com';
+                                        },
+                                        getPassword: function () {
+                                            return 'credential-api-token';
+                                        }
+                                    };
+                                }
+                            };
+                        },
+                        getClient: function () {
+                            return client;
+                        },
+                        call: function (requestData) {
+                            capturedPayload = callbacks.createRequest(this, requestData);
+
+                            return {
+                                ok: true,
+                                object: callbacks.parseResponse(this, client)
+                            };
+                        }
+                    };
+                }
+            },
+            '*/cartridge/scripts/config/Config': {
+                AUTH_MODES: {
+                    API_KEY: 'apiKey',
+                    SEARCH_TOKEN: 'searchToken'
+                },
+                SERVICE_IDS: {
+                    COMMERCE_API: 'coveo.http.commerce.api'
+                },
+                getSettings: function () {
+                    return {};
+                }
+            },
+            '*/cartridge/scripts/services/SearchTokenService': {
+                requestSearchToken: function () {
+                    throw new Error('Search token flow should not be used in apiKey mode.');
+                }
+            },
+            '*/cartridge/scripts/services/CoveoServiceSupport': loadModule(
+                path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/services/CoveoServiceSupport.js'),
+                {}
+            ),
+            '*/cartridge/scripts/helpers/UrlHelper': {
+                buildEndpoint: function (baseUrl, endpointPath) {
+                    return baseUrl.replace(/\/+$/, '') + '/' + endpointPath;
+                }
+            },
+            '*/cartridge/scripts/helpers/Logger': {
+                info: function () {},
+                warn: function () {},
+                error: function () {}
+            }
+        }
+    );
+    var response = CommerceHttpService.request({
         name: 'search',
-        method: 'POST',
-        url: 'https://platform.cloud.coveo.com/rest/search',
-        headers: {
-            Authorization: 'Bearer commerce-token',
-            'Content-Type': 'application/json'
+        endpointPath: 'search',
+        settings: {
+            organizationId: 'org-1',
+            authMode: 'apiKey',
+            retryCount: 0
         },
         body: {
             query: 'chien'
-        },
-        timeout: 3000
+        }
     });
 
     assert.strictEqual(capturedServiceId, 'coveo.http.commerce.api');
-    assert.strictEqual(capturedMethod, 'POST');
-    assert.strictEqual(capturedUrl, 'https://platform.cloud.coveo.com/rest/search');
-    assert.strictEqual(capturedHeaders.Authorization, 'Bearer commerce-token');
+    assert.strictEqual(capturedUrl, 'https://platform.cloud.coveo.com/rest/organizations/org-1/commerce/v2/search');
+    assert.strictEqual(capturedHeaders.Authorization, 'Bearer credential-api-token');
+    assert.strictEqual(capturedHeaders.Accept, 'application/json');
     assert.strictEqual(capturedHeaders['Content-Type'], 'application/json');
     assert.strictEqual(capturedPayload, JSON.stringify({
         query: 'chien'
     }));
-    assert.strictEqual(capturedTimeout, 3000);
     assert.strictEqual(response.statusCode, 200);
     assert.strictEqual(response.ok, true);
-    assert.strictEqual(response.body, '{"token":"service-token"}');
+    assert.strictEqual(response.data.responseId, 'response-1');
+});
+
+test('CoveoCommerceHttpService uses SearchTokenService in searchToken mode', function () {
+    var capturedAuthorization = '';
+    var CommerceHttpService = loadModule(
+        path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/services/CoveoCommerceHttpService.js'),
+        {
+            'dw/svc/LocalServiceRegistry': {
+                createService: function (serviceId, callbacks) {
+                    var client = {
+                        statusCode: 200,
+                        text: '{"responseId":"response-1"}',
+                        getAllResponseHeaders: function () {
+                            return {};
+                        }
+                    };
+
+                    return {
+                        setAuthentication: function () {},
+                        setRequestMethod: function () {},
+                        setURL: function () {},
+                        setEncoding: function () {},
+                        addHeader: function (name, value) {
+                            if (name === 'Authorization') {
+                                capturedAuthorization = value;
+                            }
+                        },
+                        getConfiguration: function () {
+                            return {
+                                getCredential: function () {
+                                    return {
+                                        getURL: function () {
+                                            return 'https://platform.cloud.coveo.com';
+                                        },
+                                        getPassword: function () {
+                                            return '';
+                                        }
+                                    };
+                                }
+                            };
+                        },
+                        getClient: function () {
+                            return client;
+                        },
+                        call: function (requestData) {
+                            callbacks.createRequest(this, requestData);
+
+                            return {
+                                ok: true,
+                                object: callbacks.parseResponse(this, client)
+                            };
+                        }
+                    };
+                }
+            },
+            '*/cartridge/scripts/config/Config': {
+                AUTH_MODES: {
+                    API_KEY: 'apiKey',
+                    SEARCH_TOKEN: 'searchToken'
+                },
+                SERVICE_IDS: {
+                    COMMERCE_API: 'coveo.http.commerce.api'
+                },
+                getSettings: function () {
+                    return {};
+                }
+            },
+            '*/cartridge/scripts/services/SearchTokenService': {
+                requestSearchToken: function (authContext, settings) {
+                    assert.strictEqual(authContext.currentCustomer.profile.email, 'shopper@example.com');
+                    assert.strictEqual(settings.authMode, 'searchToken');
+                    return 'search-token-1';
+                }
+            },
+            '*/cartridge/scripts/services/CoveoServiceSupport': loadModule(
+                path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/services/CoveoServiceSupport.js'),
+                {}
+            ),
+            '*/cartridge/scripts/helpers/UrlHelper': {
+                buildEndpoint: function (baseUrl, endpointPath) {
+                    return baseUrl.replace(/\/+$/, '') + '/' + endpointPath;
+                }
+            },
+            '*/cartridge/scripts/helpers/Logger': {
+                info: function () {},
+                warn: function () {},
+                error: function () {}
+            }
+        }
+    );
+
+    CommerceHttpService.request({
+        name: 'search',
+        endpointPath: 'search',
+        settings: {
+            organizationId: 'org-1',
+            authMode: 'searchToken',
+            retryCount: 0
+        },
+        authContext: {
+            currentCustomer: {
+                profile: {
+                    email: 'shopper@example.com'
+                }
+            }
+        },
+        body: {
+            query: 'chien'
+        }
+    });
+
+    assert.strictEqual(capturedAuthorization, 'Bearer search-token-1');
 });
 
 test('GtmHelper builds search payload with response metadata', function () {
@@ -528,9 +694,10 @@ test('CommerceApiService.search attaches sanitized debug snapshot when coveoDebu
                     };
                 }
             },
-            '*/cartridge/scripts/services/HttpClient': {
+            '*/cartridge/scripts/services/CoveoCommerceHttpService': {
                 request: function (options) {
                     assert.strictEqual(options.name, 'search');
+                    assert.strictEqual(options.endpointPath, 'search');
                     assert.strictEqual(options.body.query, 'chien');
                     return {
                         statusCode: 200,
@@ -568,11 +735,6 @@ test('CommerceApiService.search attaches sanitized debug snapshot when coveoDebu
             },
             '*/cartridge/models/RecommendationResult': function (data) {
                 return data;
-            },
-            '*/cartridge/scripts/helpers/UrlHelper': {
-                buildEndpoint: function (apiEndpoint, endpointPath) {
-                    return apiEndpoint + '/' + endpointPath;
-                }
             },
             '*/cartridge/scripts/helpers/Logger': {
                 debug: function () {},
@@ -638,9 +800,10 @@ test('CommerceApiService.productSuggest maps normalized products', function () {
                     };
                 }
             },
-            '*/cartridge/scripts/services/HttpClient': {
+            '*/cartridge/scripts/services/CoveoCommerceHttpService': {
                 request: function (options) {
                     assert.strictEqual(options.name, 'productSuggest');
+                    assert.strictEqual(options.endpointPath, 'search/productSuggest');
                     return {
                         data: {
                             items: [{
@@ -683,11 +846,6 @@ test('CommerceApiService.productSuggest maps normalized products', function () {
             },
             '*/cartridge/models/RecommendationResult': function (data) {
                 return data;
-            },
-            '*/cartridge/scripts/helpers/UrlHelper': {
-                buildEndpoint: function (apiEndpoint, endpointPath) {
-                    return apiEndpoint + '/' + endpointPath;
-                }
             },
             '*/cartridge/scripts/helpers/Logger': {
                 debug: function () {},
@@ -747,9 +905,10 @@ test('CommerceApiService.querySuggest normalizes query suggestions', function ()
                     };
                 }
             },
-            '*/cartridge/scripts/services/HttpClient': {
+            '*/cartridge/scripts/services/CoveoCommerceHttpService': {
                 request: function (options) {
                     assert.strictEqual(options.name, 'querySuggest');
+                    assert.strictEqual(options.endpointPath, 'search/querySuggest');
                     return {
                         data: {
                             suggestions: ['chien', 'chiot'],
@@ -787,11 +946,6 @@ test('CommerceApiService.querySuggest normalizes query suggestions', function ()
             },
             '*/cartridge/models/RecommendationResult': function (data) {
                 return data;
-            },
-            '*/cartridge/scripts/helpers/UrlHelper': {
-                buildEndpoint: function (apiEndpoint, endpointPath) {
-                    return apiEndpoint + '/' + endpointPath;
-                }
             },
             '*/cartridge/scripts/helpers/Logger': {
                 debug: function () {},

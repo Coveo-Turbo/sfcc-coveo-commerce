@@ -1,7 +1,5 @@
 'use strict';
 
-var LocalServiceRegistry = require('dw/svc/LocalServiceRegistry');
-
 function getNow() {
     return new Date().getTime();
 }
@@ -13,6 +11,17 @@ function sanitizeLogValue(value, maxLength) {
         .replace(/\s+/g, ' ')
         .replace(/^\s+|\s+$/g, '')
         .slice(0, maxLength || 1024);
+}
+
+function redactSensitiveData(value) {
+    return String(value || '')
+        .replace(/(Authorization["']?\s*[:=]\s*["']?Bearer\s+)[^"',\s]+/ig, '$1[REDACTED]')
+        .replace(/(Bearer\s+)[A-Za-z0-9._-]+/g, '$1[REDACTED]')
+        .replace(/("?(?:token|accessToken|searchToken|secret)"?\s*:\s*")[^"]+/ig, '$1[REDACTED]');
+}
+
+function filterLogMessage(message) {
+    return sanitizeLogValue(redactSensitiveData(message), 2048);
 }
 
 function getStatusCode(httpClient) {
@@ -45,6 +54,24 @@ function getHeaders(httpClient) {
     }
 
     return httpClient.getAllResponseHeaders();
+}
+
+function buildResponseFromClient(httpClient, duration) {
+    var statusCode = getStatusCode(httpClient);
+    var body = getText(httpClient);
+    var headers = getHeaders(httpClient);
+
+    if (!statusCode && !body && !Object.keys(headers).length) {
+        return null;
+    }
+
+    return {
+        statusCode: statusCode,
+        ok: statusCode >= 200 && statusCode < 300,
+        body: body,
+        headers: headers,
+        duration: duration
+    };
 }
 
 function getResultValue(result, methodName, propertyName, fallback) {
@@ -85,88 +112,6 @@ function getResultErrorMessage(result) {
 
 function getUnavailableReason(result) {
     return getResultValue(result, 'getUnavailableReason', 'unavailableReason', '');
-}
-
-function buildResponseFromClient(httpClient, duration) {
-    var statusCode = getStatusCode(httpClient);
-    var body = getText(httpClient);
-    var headers = getHeaders(httpClient);
-
-    if (!statusCode && !body && !Object.keys(headers).length) {
-        return null;
-    }
-
-    return {
-        statusCode: statusCode,
-        ok: statusCode >= 200 && statusCode < 300,
-        body: body,
-        headers: headers,
-        duration: duration
-    };
-}
-
-function applyTimeout(service, timeoutMillis) {
-    var httpClient;
-
-    if (!timeoutMillis || !service || !service.getClient) {
-        return;
-    }
-
-    httpClient = service.getClient();
-
-    if (httpClient && httpClient.setTimeout) {
-        httpClient.setTimeout(timeoutMillis);
-    }
-}
-
-function normalizeBody(body) {
-    if (body === null || typeof body === 'undefined') {
-        return null;
-    }
-
-    if (typeof body === 'string') {
-        return body;
-    }
-
-    return JSON.stringify(body);
-}
-
-function createService(serviceId) {
-    return LocalServiceRegistry.createService(serviceId, {
-        createRequest: function (service, requestData) {
-            var data = requestData || {};
-            var headers = data.headers || {};
-            var payload = normalizeBody(data.body);
-
-            service.setAuthentication('NONE');
-            service.setRequestMethod((data.method || 'GET').toUpperCase());
-            service.setURL(data.url);
-            service.setEncoding('UTF-8');
-            applyTimeout(service, data.timeout);
-
-            Object.keys(headers).forEach(function (headerName) {
-                service.addHeader(headerName, headers[headerName]);
-            });
-
-            return payload;
-        },
-        parseResponse: function (service, httpClient) {
-            return buildResponseFromClient(httpClient, 0);
-        },
-        getRequestLogMessage: function (requestData) {
-            var data = requestData || {};
-
-            return sanitizeLogValue((data.method || 'GET').toUpperCase() + ' ' + (data.url || ''), 2048);
-        },
-        getResponseLogMessage: function (responseData) {
-            var data = responseData || {};
-
-            return sanitizeLogValue('status=' + (data.statusCode || 0), 256);
-        },
-        filterLogMessage: function (message) {
-            return sanitizeLogValue(message, 2048);
-        }
-    });
 }
 
 function isRetryableFailure(statusCode, unavailableReason) {
@@ -215,13 +160,9 @@ function createServiceError(serviceId, operationName, result, response) {
     return error;
 }
 
-function call(serviceId, requestOptions) {
-    var operationName = requestOptions && requestOptions.name ? requestOptions.name : 'request';
-    var service = createService(serviceId);
-    var startedAt = getNow();
-    var result = service.call(requestOptions || {});
+function createServiceResult(serviceId, operationName, result, service, startedAt) {
     var duration = getNow() - startedAt;
-    var response = getResultObject(result) || buildResponseFromClient(service.getClient ? service.getClient() : null, duration);
+    var response = getResultObject(result) || buildResponseFromClient(service && service.getClient ? service.getClient() : null, duration);
 
     if (response) {
         response.duration = duration;
@@ -242,6 +183,76 @@ function call(serviceId, requestOptions) {
     throw createServiceError(serviceId, operationName, result, response);
 }
 
+function normalizeBody(body) {
+    if (body === null || typeof body === 'undefined') {
+        return null;
+    }
+
+    if (typeof body === 'string') {
+        return body;
+    }
+
+    return JSON.stringify(body);
+}
+
+function getCredential(service) {
+    var configuration;
+
+    if (!service || !service.getConfiguration) {
+        return null;
+    }
+
+    configuration = service.getConfiguration();
+
+    if (!configuration || !configuration.getCredential) {
+        return null;
+    }
+
+    return configuration.getCredential();
+}
+
+function getCredentialPassword(service) {
+    var credential = getCredential(service);
+
+    if (!credential) {
+        return '';
+    }
+
+    if (credential.getPassword) {
+        return credential.getPassword();
+    }
+
+    return credential.password || '';
+}
+
+function getCredentialURL(service) {
+    var credential = getCredential(service);
+
+    if (!credential) {
+        return '';
+    }
+
+    if (credential.getURL) {
+        return credential.getURL();
+    }
+
+    return credential.URL || credential.url || '';
+}
+
+function buildStatusLogMessage(responseData) {
+    var data = responseData || {};
+
+    return sanitizeLogValue('status=' + (data.statusCode || 0), 256);
+}
+
 module.exports = {
-    call: call
+    buildResponseFromClient: buildResponseFromClient,
+    buildStatusLogMessage: buildStatusLogMessage,
+    createServiceResult: createServiceResult,
+    filterLogMessage: filterLogMessage,
+    getCredentialPassword: getCredentialPassword,
+    getCredentialURL: getCredentialURL,
+    getNow: getNow,
+    normalizeBody: normalizeBody,
+    sanitizeLogValue: sanitizeLogValue
 };

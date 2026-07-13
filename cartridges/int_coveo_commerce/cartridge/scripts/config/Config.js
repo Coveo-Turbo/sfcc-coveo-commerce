@@ -2,7 +2,6 @@
 
 var Site = require('dw/system/Site');
 
-var DEFAULT_TIMEOUT_MILLIS = 5000;
 var DEFAULT_RETRY_COUNT = 1;
 var DEFAULT_SEARCH_TOKEN_VALIDITY_MILLIS = 3600000;
 var DEFAULT_SEARCH_TOKEN_SECURITY_PROVIDER = 'Email Security Provider';
@@ -19,12 +18,8 @@ var SERVICE_IDS = {
 
 var PREFERENCES = {
     ORGANIZATION_ID: 'coveoCommerceOrganizationId',
-    API_ENDPOINT: 'coveoCommerceApiEndpoint',
-    API_TOKEN: 'coveoCommerceApiToken',
     TRACKING_ID: 'coveoCommerceTrackingId',
     AUTH_MODE: 'coveoCommerceAuthMode',
-    AUTHENTICATED_SEARCH_API_KEY: 'coveoCommerceAuthenticatedSearchApiKey',
-    SEARCH_TOKEN_SERVICE_URL: 'coveoCommerceSearchTokenServiceUrl',
     SEARCH_TOKEN_SECURITY_PROVIDER: 'coveoCommerceSearchTokenSecurityProvider',
     SEARCH_TOKEN_USER_TYPE: 'coveoCommerceSearchTokenUserType',
     SEARCH_TOKEN_VALIDITY_MILLIS: 'coveoCommerceSearchTokenValidityMillis',
@@ -36,7 +31,6 @@ var PREFERENCES = {
     PIPELINE: 'coveoCommercePipeline',
     ANALYTICS_ENABLED: 'coveoCommerceAnalyticsEnabled',
     VERBOSE_LOGGING: 'coveoCommerceVerboseLogging',
-    TIMEOUT_MILLIS: 'coveoCommerceTimeoutMillis',
     RETRY_COUNT: 'coveoCommerceRetryCount'
 };
 
@@ -100,12 +94,8 @@ function getSettings() {
 
     return {
         organizationId: getPreferenceValue(site, PREFERENCES.ORGANIZATION_ID, ''),
-        apiEndpoint: getPreferenceValue(site, PREFERENCES.API_ENDPOINT, ''),
-        apiToken: getPreferenceValue(site, PREFERENCES.API_TOKEN, ''),
         trackingId: getPreferenceValue(site, PREFERENCES.TRACKING_ID, ''),
         authMode: normalizeAuthMode(getPreferenceValue(site, PREFERENCES.AUTH_MODE, AUTH_MODES.API_KEY)),
-        authenticatedSearchApiKey: getPreferenceValue(site, PREFERENCES.AUTHENTICATED_SEARCH_API_KEY, ''),
-        searchTokenServiceUrl: getPreferenceValue(site, PREFERENCES.SEARCH_TOKEN_SERVICE_URL, ''),
         searchTokenSecurityProvider: getPreferenceValue(
             site,
             PREFERENCES.SEARCH_TOKEN_SECURITY_PROVIDER,
@@ -124,7 +114,6 @@ function getSettings() {
         pipeline: getPreferenceValue(site, PREFERENCES.PIPELINE, ''),
         analyticsEnabled: normalizeBoolean(getPreferenceValue(site, PREFERENCES.ANALYTICS_ENABLED, true), true),
         verboseLogging: normalizeBoolean(getPreferenceValue(site, PREFERENCES.VERBOSE_LOGGING, false), false),
-        timeoutMillis: normalizeNumber(getPreferenceValue(site, PREFERENCES.TIMEOUT_MILLIS, DEFAULT_TIMEOUT_MILLIS), DEFAULT_TIMEOUT_MILLIS),
         retryCount: normalizeNumber(getPreferenceValue(site, PREFERENCES.RETRY_COUNT, DEFAULT_RETRY_COUNT), DEFAULT_RETRY_COUNT)
     };
 }
@@ -137,24 +126,8 @@ function validateSettings(settings) {
         missing.push(PREFERENCES.ORGANIZATION_ID);
     }
 
-    if (!config.apiEndpoint) {
-        missing.push(PREFERENCES.API_ENDPOINT);
-    }
-
     if (!config.trackingId) {
         missing.push(PREFERENCES.TRACKING_ID);
-    }
-
-    if (config.authMode === AUTH_MODES.SEARCH_TOKEN) {
-        if (!config.authenticatedSearchApiKey) {
-            missing.push(PREFERENCES.AUTHENTICATED_SEARCH_API_KEY);
-        }
-
-        return missing;
-    }
-
-    if (!config.apiToken) {
-        missing.push(PREFERENCES.API_TOKEN);
     }
 
     return missing;

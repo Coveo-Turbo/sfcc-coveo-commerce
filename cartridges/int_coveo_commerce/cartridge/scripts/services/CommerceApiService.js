@@ -6,13 +6,12 @@ var RecommendationResult = require('*/cartridge/models/RecommendationResult');
 var Config = require('*/cartridge/scripts/config/Config');
 var Logger = require('*/cartridge/scripts/helpers/Logger');
 var QueryBuilder = require('*/cartridge/scripts/helpers/QueryBuilder');
-var UrlHelper = require('*/cartridge/scripts/helpers/UrlHelper');
 var SearchResultMapper = require('*/cartridge/scripts/mappers/SearchResultMapper');
 var ListingResultMapper = require('*/cartridge/scripts/mappers/ListingResultMapper');
 var RecommendationMapper = require('*/cartridge/scripts/mappers/RecommendationMapper');
 var ProductSuggestionMapper = require('*/cartridge/scripts/mappers/ProductSuggestionMapper');
 var AnalyticsService = require('*/cartridge/scripts/services/AnalyticsService');
-var HttpClient = require('*/cartridge/scripts/services/HttpClient');
+var CoveoCommerceHttpService = require('*/cartridge/scripts/services/CoveoCommerceHttpService');
 
 var ENDPOINTS = {
     SEARCH: 'search',
@@ -21,30 +20,6 @@ var ENDPOINTS = {
     PRODUCT_SUGGEST: 'search/productSuggest',
     RECOMMENDATIONS: 'recommendations'
 };
-
-function getHttpRequest(params) {
-    if (params && params.request) {
-        return params.request;
-    }
-
-    if (typeof request !== 'undefined') {
-        return request;
-    }
-
-    return null;
-}
-
-function getHttpResponse(params) {
-    if (params && params.response) {
-        return params.response;
-    }
-
-    if (typeof response !== 'undefined') {
-        return response;
-    }
-
-    return null;
-}
 
 function validateConfiguration(settings) {
     var missing = Config.validateSettings(settings);
@@ -79,28 +54,25 @@ function validatePayload(operationName, payload) {
 }
 
 function buildAnalyticsContext(params) {
+    var requestParams = params || {};
+
     return AnalyticsService.buildRequestContext(
-        getHttpRequest(params),
-        getHttpResponse(params),
+        requestParams.request || null,
+        requestParams.response || null,
         {
-            searchHub: params.searchHub,
-            pipeline: params.pipeline
+            searchHub: requestParams.searchHub,
+            pipeline: requestParams.pipeline
         }
     );
 }
 
 function execute(operationName, endpointPath, payload, authContext, settings) {
-    return HttpClient.request({
+    return CoveoCommerceHttpService.request({
         name: operationName,
-        method: 'POST',
-        url: UrlHelper.buildEndpoint(settings.apiEndpoint, endpointPath),
-        headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json'
-        },
+        endpointPath: endpointPath,
         authContext: authContext,
         body: payload,
-        timeout: settings.timeoutMillis,
+        settings: settings,
         retryCount: settings.retryCount,
         parseJson: true
     });
