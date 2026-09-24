@@ -1204,6 +1204,7 @@ test('Search controller exposes field suggestion facets and standalone facet val
         {
             globals: {
                 request: {
+                    httpReferer: 'https://example.com/search?q=dog',
                     httpURL: {
                         toString: function () {
                             return 'https://example.com/Search-Facet';
@@ -1240,6 +1241,7 @@ test('Search controller exposes field suggestion facets and standalone facet val
                 facetSearch: function (params) {
                     facetCallCount += 1;
                     assert.strictEqual(typeof params.userId, 'undefined');
+                    assert.strictEqual(params.currentUrl, 'https://example.com/search?q=dog');
 
                     if (params.facetId === 'throws') {
                         throw new Error('Bearer secret must not be exposed.');

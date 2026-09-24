@@ -34,7 +34,8 @@ function buildFacetParams(req) {
         currentCustomer: req.currentCustomer,
         session: req.session,
         request: request,
-        response: response
+        response: response,
+        currentUrl: request.httpReferer || ''
     };
 
     if (typeof query.q !== 'undefined') {
