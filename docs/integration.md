@@ -87,6 +87,24 @@ For each descriptor the storefront chooses to display, call the standalone facet
 Search-Facet?q=&facetId=ec_brand&numberOfValues=5
 ```
 
+Additional Commerce context can be passed as URL-encoded JSON. For example, Mondou's best-seller facet sorting context is:
+
+```text
+Search-Facet?q=&facetId=ec_brand&numberOfValues=5&context={"custom":{"applyBestSellerSort":true}}
+```
+
+With `curl`, use `--data-urlencode`:
+
+```bash
+curl --get "$BASE/Search-Facet" \
+  --data-urlencode "q=" \
+  --data-urlencode "facetId=ec_brand" \
+  --data-urlencode "numberOfValues=5" \
+  --data-urlencode 'context={"custom":{"applyBestSellerSort":true}}'
+```
+
+The sample route accepts `context` only as a valid JSON object up to 8192 characters. Unrelated top-level query parameters are not forwarded into the Commerce authentication context.
+
 This delegates to `CommerceApiService.facetSearch()` and sends `POST /commerce/v2/facet?type=SEARCH`. The normalized response is:
 
 ```json

@@ -9,6 +9,7 @@ var Logger = require('*/cartridge/scripts/helpers/Logger');
 
 var MAX_FACET_QUERY_LENGTH = 512;
 var MAX_FACET_VALUES = 100;
+var MAX_FACET_CONTEXT_LENGTH = 8192;
 
 function buildParams(req) {
     var query = req.querystring || {};
@@ -31,6 +32,7 @@ function buildFacetParams(req) {
     var params = {
         facetId: query.facetId,
         numberOfValues: typeof query.numberOfValues !== 'undefined' ? query.numberOfValues : query.count,
+        context: query.context,
         currentCustomer: req.currentCustomer,
         session: req.session,
         request: request,
@@ -70,6 +72,7 @@ function validateFacetRouteParams(params) {
     var query = typeof params.q !== 'undefined' ? params.q : params.query;
     var rawNumberOfValues = params.numberOfValues;
     var numberOfValues;
+    var parsedContext;
 
     if (typeof facetId !== 'string' || !facetId || facetId.length > 128 || !/^[A-Za-z0-9_.-]+$/.test(facetId)) {
         return 'A valid facetId is required.';
@@ -93,6 +96,24 @@ function validateFacetRouteParams(params) {
         if (isNaN(numberOfValues) || numberOfValues < 1 || numberOfValues > MAX_FACET_VALUES) {
             return 'numberOfValues must be between 1 and ' + MAX_FACET_VALUES + '.';
         }
+    }
+
+    if (typeof params.context !== 'undefined' && params.context !== '') {
+        if (typeof params.context !== 'string' || params.context.length > MAX_FACET_CONTEXT_LENGTH) {
+            return 'context must be a JSON object no larger than ' + MAX_FACET_CONTEXT_LENGTH + ' characters.';
+        }
+
+        try {
+            parsedContext = JSON.parse(params.context);
+        } catch (error) {
+            return 'context must contain valid JSON.';
+        }
+
+        if (Object.prototype.toString.call(parsedContext) !== '[object Object]') {
+            return 'context must be a JSON object.';
+        }
+
+        params.context = parsedContext;
     }
 
     return '';

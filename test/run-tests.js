@@ -1259,6 +1259,7 @@ test('Search controller exposes field suggestion facets and standalone facet val
                     }
 
                     assert.strictEqual(params.facetId, 'ec_brand');
+                    assert.strictEqual(params.context.custom.applyBestSellerSort, true);
                     return {
                         facetId: 'ec_brand',
                         values: [{
@@ -1307,6 +1308,7 @@ test('Search controller exposes field suggestion facets and standalone facet val
             q: '',
             facetId: 'ec_brand',
             numberOfValues: '5',
+            context: '{"custom":{"applyBestSellerSort":true}}',
             userId: 'attacker@example.com',
             endpointPath: 'untrusted'
         }
@@ -1327,6 +1329,19 @@ test('Search controller exposes field suggestion facets and standalone facet val
     }, res, next);
     assert.strictEqual(statusCode, 400);
     assert.strictEqual(jsonResponse.error, true);
+    assert.strictEqual(facetCallCount, 1);
+
+    statusCode = 200;
+    facetRoute({
+        querystring: {
+            q: '',
+            facetId: 'ec_brand',
+            numberOfValues: '5',
+            context: '{invalid}'
+        }
+    }, res, next);
+    assert.strictEqual(statusCode, 400);
+    assert.strictEqual(jsonResponse.message, 'context must contain valid JSON.');
     assert.strictEqual(facetCallCount, 1);
 
     statusCode = 200;

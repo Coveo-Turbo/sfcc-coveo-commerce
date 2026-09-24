@@ -86,12 +86,15 @@ cartridges/
 - [Configuration Guide](docs/configuration.md)
 - [Integration Guide](docs/integration.md)
 - [Customization Guide](docs/customization.md)
+- [Validation Guide](docs/validation.md)
 
 ## Local Development
 
 ```text
 npm install
 npm test
+export COVEO_BASE_URL="https://<sandbox-host>/on/demandware.store/Sites-<site-id>-Site/fr_CA"
+npm run validateServices
 cp dw.example.json dw.json
 npm run uploadCartridge
 npm run packageMetadata
