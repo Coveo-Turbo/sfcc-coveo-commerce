@@ -1,6 +1,8 @@
 # Customization Guide
 
-The cartridge is designed to be overridden from a custom storefront cartridge placed earlier in the cartridge path.
+Scripts and mappers can be overridden from a custom storefront cartridge placed earlier in the cartridge path. Controllers require additional care: SFCC selects the first controller with a given filename and does not merge same-named controllers automatically.
+
+For an existing storefront, prefer calling `CommerceApiService` from the storefront's controllers. If a customer `Search.js` or `Category.js` appears before this cartridge, it must explicitly expose or chain any sample routes it wants to retain. Conversely, placing `int_coveo_commerce` first can hide downstream storefront routes because its sample controllers are standalone.
 
 ## Common Override Points
 

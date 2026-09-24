@@ -77,7 +77,7 @@ cartridges/
 
 - ISML templates
 - CSS or JavaScript UI components
-- PDP, cart, checkout, inventory, or pricing logic
+- PDP, cart, checkout, inventory, price-book selection, pricing calculation, or customer-specific pricing logic
 - Customer-specific storefront business rules
 
 ## Documentation
@@ -93,11 +93,16 @@ cartridges/
 ```text
 npm install
 npm test
-export COVEO_BASE_URL="https://<sandbox-host>/on/demandware.store/Sites-<site-id>-Site/fr_CA"
-npm run validateServices
 cp dw.example.json dw.json
 npm run uploadCartridge
 npm run packageMetadata
+```
+
+After activating the uploaded code version, importing the metadata, and configuring the site preferences and SFCC services, run the sandbox route/status smoke matrix:
+
+```text
+export COVEO_BASE_URL="https://<sandbox-host>/on/demandware.store/Sites-<site-id>-Site/fr_CA"
+npm run validateServices
 ```
 
 `dw.json` is intentionally ignored and should stay local to your machine.
@@ -109,12 +114,14 @@ The cartridge now uses concrete SFCC `LocalServiceRegistry` services for outboun
 - `coveo.http.commerce.api`
 - `coveo.http.search.token`
 
-## Cartridge Path
+## Cartridge Path and Controllers
 
-Typical generic cartridge path ordering:
+The cartridge must be present on the site cartridge path. Ordering depends on how the storefront integrates its controllers. For an intentionally standalone demonstration against SFRA base, the order can be:
 
 ```text
 int_coveo_commerce:app_storefront_base
 ```
 
-Customers can place their own storefront cartridge ahead of `int_coveo_commerce` to override sample controllers, mappers, or services.
+SFCC resolves controllers from left to right and does not merge controllers with the same filename automatically. With the order above, the sample `Search.js` and `Category.js` replace downstream controllers and can hide SFRA routes they do not declare. Do not use this ordering unchanged in an existing storefront without reviewing those controllers.
+
+The recommended customer integration is to keep the storefront cartridge in control, call `CommerceApiService` from its existing controllers, and expose only the routes it needs. Placing a custom cartridge before `int_coveo_commerce` also allows mapper or service overrides, but does not automatically make the sample `Search-*` or `Category-*` routes available; the custom controller must explicitly expose or chain them.

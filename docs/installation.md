@@ -16,13 +16,21 @@ The cartridge source lives in:
 cartridges/int_coveo_commerce
 ```
 
-Typical generic cartridge path:
+For an intentionally standalone demonstration against SFRA base, the cartridge path can be:
 
 ```text
 int_coveo_commerce:app_storefront_base
 ```
 
-If your storefront overrides the sample controllers or mappers from this cartridge, place the custom cartridge before `int_coveo_commerce`.
+This ordering makes the cartridge's standalone `Search.js` and `Category.js` the selected controllers. SFCC does not merge same-named controllers automatically, so these sample controllers can hide downstream SFRA routes they do not declare.
+
+For an existing storefront, keep the customer cartridge in control and call `CommerceApiService` from its controllers. A common order is:
+
+```text
+app_custom_storefront:int_coveo_commerce:app_storefront_base
+```
+
+With that order, a customer `Search.js` or `Category.js` takes precedence and must explicitly expose or chain any desired sample routes. Mapper and service overrides can also be placed in the customer cartridge.
 
 ## Deploy
 
@@ -92,5 +100,5 @@ Keep `dw.json` local and out of source control.
 
 - Configure credentials and runtime settings
 - Wire the search and category routes to your storefront flow
-- Connect query suggestions and recommendation slots
+- Connect query suggestions, field-suggestion facet searches, and recommendation slots
 - Push analytics events with your GTM or storefront analytics layer
