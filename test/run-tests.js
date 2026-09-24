@@ -307,6 +307,17 @@ test('ProductSuggestionMapper normalizes products and analytics metadata', funct
     assert.strictEqual(mapped.analytics.queryUid, 'query-1');
 });
 
+test('ProductMapper falls back to regular price when promotional price is null', function () {
+    var ProductMapper = require(path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/mappers/ProductMapper.js'));
+    var mapped = ProductMapper.map({
+        ec_product_id: 'sku-1',
+        ec_promo_price: null,
+        ec_price: 50.49
+    });
+
+    assert.strictEqual(mapped.price, 50.49);
+});
+
 test('PaginationMapper supports nested listing pagination payloads', function () {
     var PaginationMapper = require(path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/mappers/PaginationMapper.js'));
     var mapped = PaginationMapper.map({
