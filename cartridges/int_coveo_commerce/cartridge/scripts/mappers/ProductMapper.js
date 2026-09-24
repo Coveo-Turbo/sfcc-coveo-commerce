@@ -5,19 +5,19 @@ function mapPrice(product) {
         return null;
     }
 
-    if (typeof product.price !== 'undefined') {
+    if (typeof product.price !== 'undefined' && product.price !== null) {
         return product.price;
     }
 
-    if (product.pricing && typeof product.pricing.price !== 'undefined') {
+    if (product.pricing && typeof product.pricing.price !== 'undefined' && product.pricing.price !== null) {
         return product.pricing.price;
     }
 
-    if (typeof product.ec_promo_price !== 'undefined') {
+    if (typeof product.ec_promo_price !== 'undefined' && product.ec_promo_price !== null) {
         return product.ec_promo_price;
     }
 
-    if (product.ec_price && typeof product.ec_price !== 'undefined') {
+    if (typeof product.ec_price !== 'undefined' && product.ec_price !== null) {
         return product.ec_price;
     }
 

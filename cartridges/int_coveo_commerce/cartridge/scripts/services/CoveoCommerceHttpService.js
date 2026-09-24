@@ -274,6 +274,11 @@ function buildMockPayload(endpointPath) {
                 responseId: 'mock-response-id',
                 queryUid: 'mock-query-uid'
             };
+        case 'facet':
+            return {
+                values: [],
+                moreValuesAvailable: false
+            };
         case 'recommendations':
             return {
                 recommendations: [],
@@ -323,7 +328,8 @@ function createService() {
             service.setURL(
                 UrlHelper.buildEndpoint(
                     getCommerceApiBaseUrl(service, settings),
-                    data.endpointPath || ''
+                    data.endpointPath || '',
+                    data.queryParams
                 )
             );
             service.setEncoding('UTF-8');
@@ -365,6 +371,7 @@ function call(requestOptions) {
     var startedAt = ServiceSupport.getNow();
     var result = service.call({
         endpointPath: options.endpointPath,
+        queryParams: options.queryParams,
         payload: options.body,
         authContext: options.authContext,
         settings: options.settings
@@ -407,6 +414,7 @@ function request(options) {
             response = call({
                 name: operationName,
                 endpointPath: requestOptions.endpointPath,
+                queryParams: requestOptions.queryParams,
                 body: requestOptions.body,
                 authContext: requestOptions.authContext,
                 settings: settings

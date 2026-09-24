@@ -1,5 +1,8 @@
 'use strict';
 
+var DEFAULT_FACET_VALUES = 5;
+var MAX_FACET_VALUES = 100;
+
 function normalizeNumber(value, fallback) {
     var parsed = parseInt(value, 10);
 
@@ -324,6 +327,25 @@ function buildQuerySuggestPayload(params, config, analyticsContext) {
     };
 }
 
+function buildFacetSearchPayload(params, config, analyticsContext) {
+    var commerceContext = buildCommerceContext(params, config);
+    var numberOfValues = normalizeNumber(params.numberOfValues || params.count, DEFAULT_FACET_VALUES);
+
+    numberOfValues = Math.max(1, Math.min(numberOfValues, MAX_FACET_VALUES));
+
+    return {
+        trackingId: params.trackingId || config.trackingId,
+        clientId: analyticsContext.clientId,
+        query: params.q || params.query || '',
+        facetId: params.facetId || '',
+        numberOfValues: numberOfValues,
+        language: commerceContext.language,
+        country: commerceContext.country,
+        currency: commerceContext.currency,
+        context: buildBaseContext(params)
+    };
+}
+
 function buildProductSuggestPayload(params, config, analyticsContext) {
     var commerceContext = buildCommerceContext(params, config);
 
@@ -356,6 +378,7 @@ module.exports = {
     buildSearchPayload: buildSearchPayload,
     buildListingPayload: buildListingPayload,
     buildQuerySuggestPayload: buildQuerySuggestPayload,
+    buildFacetSearchPayload: buildFacetSearchPayload,
     buildProductSuggestPayload: buildProductSuggestPayload,
     buildRecommendationsPayload: buildRecommendationsPayload
 };

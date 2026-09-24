@@ -22,7 +22,7 @@ Create these custom preferences in Business Manager or define them through your 
 
 | Service ID | Purpose |
 | --- | --- |
-| `coveo.http.commerce.api` | Commerce API search, listing, suggestion, and recommendation calls |
+| `coveo.http.commerce.api` | Commerce API search, listing, query/product suggestion, facet-search, and recommendation calls |
 | `coveo.http.search.token` | Server-side search-token generation |
 
 Service notes:
@@ -40,12 +40,12 @@ Service notes:
 | --- | --- |
 | `coveoCommerceOrganizationId` | Coveo organization identifier |
 | `coveoCommerceTrackingId` | Storefront tracking ID used by Commerce API requests |
-| `coveoCommerceAuthMode` | Authentication mode: `apiKey` or `searchToken` |
 
 ## Optional Preferences
 
 | Preference ID | Purpose | Default |
 | --- | --- | --- |
+| `coveoCommerceAuthMode` | Authentication mode: `apiKey` or `searchToken` | `apiKey` |
 | `coveoCommerceSearchTokenSecurityProvider` | Security identity provider used when minting search tokens | `Email Security Provider` |
 | `coveoCommerceSearchTokenUserType` | User identity type for minted search tokens | `User` |
 | `coveoCommerceSearchTokenValidityMillis` | Search token lifetime in milliseconds | `3600000` |
@@ -70,5 +70,5 @@ Service notes:
   - `currency` defaults from the current SFRA session currency
   - site preferences act as fallbacks for non-storefront contexts, jobs, or custom service calls
 - `trackingId`, language, country, locale, currency, search hub, and pipeline can still be overridden per request by passing values into `CommerceApiService`.
-- Query suggestion and recommendation payloads can include additional context fields from the storefront layer.
+- All Commerce request payloads can include additional context fields from the storefront layer. The sample `Search-Facet` route accepts a bounded JSON-object `context`; direct service calls can pass an object through `CommerceApiService`.
 - If you need a specific user identity, groups, or filter in a search token, pass `searchTokenOptions` into `CommerceApiService` from an overriding controller or service layer.
