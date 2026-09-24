@@ -7,6 +7,9 @@ var SearchResult = require('*/cartridge/models/SearchResult');
 var GtmHelper = require('*/cartridge/scripts/helpers/GtmHelper');
 var Logger = require('*/cartridge/scripts/helpers/Logger');
 
+var MAX_FACET_QUERY_LENGTH = 512;
+var MAX_FACET_VALUES = 100;
+
 function buildParams(req) {
     var query = req.querystring || {};
     var params = {};
@@ -19,6 +22,28 @@ function buildParams(req) {
     params.session = req.session;
     params.request = request;
     params.response = response;
+
+    return params;
+}
+
+function buildFacetParams(req) {
+    var query = req.querystring || {};
+    var params = {
+        facetId: query.facetId,
+        numberOfValues: typeof query.numberOfValues !== 'undefined' ? query.numberOfValues : query.count,
+        currentCustomer: req.currentCustomer,
+        session: req.session,
+        request: request,
+        response: response
+    };
+
+    if (typeof query.q !== 'undefined') {
+        params.q = query.q;
+    } else if (typeof query.query !== 'undefined') {
+        params.query = query.query;
+    } else {
+        params.query = '';
+    }
 
     return params;
 }
@@ -37,6 +62,39 @@ function renderPageError(res, error) {
         }
     });
     res.render('search/searchResults');
+}
+
+function validateFacetRouteParams(params) {
+    var facetId = params.facetId;
+    var query = typeof params.q !== 'undefined' ? params.q : params.query;
+    var rawNumberOfValues = params.numberOfValues;
+    var numberOfValues;
+
+    if (typeof facetId !== 'string' || !facetId || facetId.length > 128 || !/^[A-Za-z0-9_.-]+$/.test(facetId)) {
+        return 'A valid facetId is required.';
+    }
+
+    if (typeof query !== 'string') {
+        return 'The facet-search query must be a string.';
+    }
+
+    if (query.length > MAX_FACET_QUERY_LENGTH) {
+        return 'The facet-search query is too long.';
+    }
+
+    if (typeof rawNumberOfValues !== 'undefined' && rawNumberOfValues !== '') {
+        if (typeof rawNumberOfValues !== 'string' || !/^[1-9][0-9]*$/.test(rawNumberOfValues)) {
+            return 'numberOfValues must be an integer between 1 and ' + MAX_FACET_VALUES + '.';
+        }
+
+        numberOfValues = parseInt(rawNumberOfValues, 10);
+
+        if (isNaN(numberOfValues) || numberOfValues < 1 || numberOfValues > MAX_FACET_VALUES) {
+            return 'numberOfValues must be between 1 and ' + MAX_FACET_VALUES + '.';
+        }
+    }
+
+    return '';
 }
 
 server.get('Show', function (req, res, next) {
@@ -71,6 +129,7 @@ server.get('Suggest', function (req, res, next) {
         suggestions = CommerceApiService.querySuggest(params);
         res.json({
             suggestions: suggestions.suggestions,
+            fieldSuggestionsFacets: suggestions.fieldSuggestionsFacets,
             responseId: suggestions.responseId,
             queryUid: suggestions.queryUid,
             analytics: suggestions.analytics,
@@ -89,6 +148,43 @@ server.get('Suggest', function (req, res, next) {
         res.json({
             error: true,
             message: 'Unable to retrieve Coveo query suggestions.'
+        });
+    }
+
+    return next();
+});
+
+server.get('Facet', function (req, res, next) {
+    var params = buildFacetParams(req);
+    var validationError = validateFacetRouteParams(params);
+    var result;
+
+    if (validationError) {
+        res.setStatusCode(400);
+        res.json({
+            error: true,
+            message: validationError
+        });
+        return next();
+    }
+
+    try {
+        result = CommerceApiService.facetSearch(params);
+        res.json({
+            facetId: result.facetId,
+            values: result.values,
+            moreValuesAvailable: result.moreValuesAvailable,
+            analytics: result.analytics
+        });
+    } catch (error) {
+        Logger.error('Coveo facet search failed.', {
+            message: error.message
+        });
+
+        res.setStatusCode(502);
+        res.json({
+            error: true,
+            message: 'Unable to retrieve Coveo facet values.'
         });
     }
 

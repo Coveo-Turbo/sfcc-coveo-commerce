@@ -12,6 +12,8 @@ The cartridge is designed to be overridden from a custom storefront cartridge pl
 - `scripts/services/AnalyticsService.js`
 - `scripts/services/SearchTokenService.js`
 - `scripts/mappers/ProductMapper.js`
+- `scripts/mappers/QuerySuggestionMapper.js`
+- `scripts/mappers/FacetSearchMapper.js`
 - `scripts/mappers/RecommendationMapper.js`
 
 ## Typical Customizations
@@ -20,6 +22,7 @@ The cartridge is designed to be overridden from a custom storefront cartridge pl
 - Extend normalized product payloads with custom fields
 - Change how facets or sorting are presented in view data
 - Replace the sample `Search-ProductSuggestions` route or call `CommerceApiService.productSuggest()` directly from a storefront-specific search-box controller
+- Use `Search-Suggest` to read CMH-provided `fieldSuggestionsFacets`, then call `Search-Facet` or `CommerceApiService.facetSearch()` for the descriptors the storefront displays
 - Pass `searchTokenOptions` when you need to control user groups, filters, or allowed dictionary keys in search-token mode
 - Push GTM payloads through a custom client-side analytics integration
 

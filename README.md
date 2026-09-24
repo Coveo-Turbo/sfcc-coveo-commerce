@@ -42,10 +42,12 @@ cartridges/
           UrlHelper.js
         mappers/
           FacetMapper.js
+          FacetSearchMapper.js
           ListingResultMapper.js
           PaginationMapper.js
           ProductMapper.js
           ProductSuggestionMapper.js
+          QuerySuggestionMapper.js
           RecommendationMapper.js
           SearchResultMapper.js
           SortMapper.js
@@ -65,6 +67,7 @@ cartridges/
 - Server-side search-token authentication
 - Search and category listing service wrappers
 - Query suggest, product suggest, and recommendations wrappers
+- Query-suggest field facets and standalone facet-search support
 - Analytics context management, including `clientId`
 - Normalized result models for storefront integration
 - GTM helper payload generation

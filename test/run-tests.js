@@ -32,6 +32,7 @@ function loadModule(filePath, stubs, cache) {
     var source;
     var module;
     var dirname;
+    var context;
 
     if (moduleCache[absolutePath]) {
         return moduleCache[absolutePath].exports;
@@ -53,17 +54,36 @@ function loadModule(filePath, stubs, cache) {
             return loadModule(resolveLocalModule(dirname, request), stubs, moduleCache);
         }
 
+        if (request.indexOf('*/cartridge/') === 0) {
+            return loadModule(
+                resolveLocalModule(
+                    path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge'),
+                    request.substring('*/cartridge/'.length)
+                ),
+                stubs,
+                moduleCache
+            );
+        }
+
         return require(request);
+    }
+
+    context = {
+        console: console,
+        process: process,
+        setTimeout: setTimeout,
+        clearTimeout: clearTimeout
+    };
+
+    if (stubs && stubs.globals) {
+        Object.keys(stubs.globals).forEach(function (key) {
+            context[key] = stubs.globals[key];
+        });
     }
 
     vm.runInNewContext(
         '(function (exports, require, module, __filename, __dirname) {' + source + '\n})',
-        {
-            console: console,
-            process: process,
-            setTimeout: setTimeout,
-            clearTimeout: clearTimeout
-        }
+        context
     )(module.exports, localRequire, module, absolutePath, dirname);
 
     return module.exports;
@@ -136,6 +156,122 @@ test('QueryBuilder builds listing payload with categoryId from request context',
     assert.strictEqual(payload.language, 'fr');
     assert.strictEqual(payload.country, 'CA');
     assert.strictEqual(payload.currency, 'CAD');
+});
+
+test('QueryBuilder builds facet search payload with an empty query and Commerce context', function () {
+    var QueryBuilder = require(path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/helpers/QueryBuilder.js'));
+    var payload = QueryBuilder.buildFacetSearchPayload({
+        query: '',
+        facetId: 'ec_brand',
+        numberOfValues: 5,
+        currentUrl: 'https://example.com/mondou/search',
+        context: {
+            custom: {
+                applyBestSellerSort: true
+            },
+            source: ['groupe-legault-commerce-poc@0.1.0']
+        }
+    }, {
+        trackingId: 'mondou',
+        language: 'en',
+        country: 'CA',
+        currency: 'CAD'
+    }, {
+        clientId: 'client-1'
+    });
+
+    assert.strictEqual(payload.clientId, 'client-1');
+    assert.strictEqual(payload.trackingId, 'mondou');
+    assert.strictEqual(payload.query, '');
+    assert.strictEqual(payload.facetId, 'ec_brand');
+    assert.strictEqual(payload.numberOfValues, 5);
+    assert.strictEqual(payload.language, 'en');
+    assert.strictEqual(payload.country, 'CA');
+    assert.strictEqual(payload.currency, 'CAD');
+    assert.strictEqual(payload.context.view.url, 'https://example.com/mondou/search');
+    assert.strictEqual(payload.context.custom.applyBestSellerSort, true);
+    assert.strictEqual(payload.context.source[0], 'groupe-legault-commerce-poc@0.1.0');
+});
+
+test('QuerySuggestionMapper preserves completions and CMH field suggestion facets', function () {
+    var QuerySuggestionMapper = require(path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/mappers/QuerySuggestionMapper.js'));
+    var mapped = QuerySuggestionMapper.map({
+        responseId: 'response-1',
+        completions: [{
+            expression: 'dog',
+            highlighted: '[dog]'
+        }, {
+            expression: 'cat litter',
+            highlighted: '[cat] [litter]'
+        }, {
+            expression: 'what b',
+            highlighted: '[what] [b]'
+        }, {
+            expression: 'vêt diète',
+            highlighted: '[vêt] [diète]'
+        }, {
+            expression: 'vetdiet freeze chicken',
+            highlighted: '[vetdiet] [freeze] [chicken]'
+        }],
+        fieldSuggestionsFacets: [{
+            facetId: 'ec_brand',
+            field: 'ec_brand',
+            displayName: 'Brand',
+            type: 'regular'
+        }]
+    }, {
+        clientId: 'client-1',
+        searchHub: 'storefront',
+        pipeline: 'commerce-search'
+    });
+
+    assert.strictEqual(mapped.suggestions.length, 5);
+    assert.strictEqual(mapped.suggestions[0].value, 'dog');
+    assert.strictEqual(mapped.suggestions[3].value, 'vêt diète');
+    assert.strictEqual(mapped.suggestions[4].highlighted, '[vetdiet] [freeze] [chicken]');
+    assert.strictEqual(mapped.fieldSuggestionsFacets.length, 1);
+    assert.strictEqual(mapped.fieldSuggestionsFacets[0].facetId, 'ec_brand');
+    assert.strictEqual(mapped.fieldSuggestionsFacets[0].field, 'ec_brand');
+    assert.strictEqual(mapped.fieldSuggestionsFacets[0].displayName, 'Brand');
+    assert.strictEqual(mapped.fieldSuggestionsFacets[0].type, 'regular');
+    assert.strictEqual(mapped.responseId, 'response-1');
+    assert.strictEqual(mapped.queryUid, '');
+    assert.strictEqual(mapped.analytics.clientId, 'client-1');
+
+    mapped = QuerySuggestionMapper.map({
+        completions: []
+    }, {});
+    assert.strictEqual(mapped.fieldSuggestionsFacets.length, 0);
+});
+
+test('FacetSearchMapper preserves Coveo facet values and availability', function () {
+    var FacetSearchMapper = require(path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/mappers/FacetSearchMapper.js'));
+    var mapped = FacetSearchMapper.map({
+        values: [{
+            displayValue: 'Hero Dog Treats',
+            rawValue: 'Hero Dog Treats',
+            path: [],
+            count: 49
+        }, {
+            displayValue: 'Kong',
+            rawValue: 'Kong',
+            path: [],
+            count: 104
+        }],
+        moreValuesAvailable: true
+    }, {
+        facetId: 'ec_brand'
+    }, {
+        clientId: 'client-1'
+    });
+
+    assert.strictEqual(mapped.facetId, 'ec_brand');
+    assert.strictEqual(mapped.values.length, 2);
+    assert.strictEqual(mapped.values[0].displayValue, 'Hero Dog Treats');
+    assert.strictEqual(mapped.values[0].count, 49);
+    assert.strictEqual(mapped.values[1].rawValue, 'Kong');
+    assert.strictEqual(mapped.moreValuesAvailable, true);
+    assert.strictEqual(mapped.analytics.clientId, 'client-1');
 });
 
 test('ProductSuggestionMapper normalizes products and analytics metadata', function () {
@@ -374,7 +510,7 @@ test('CoveoSearchTokenHttpService uses LocalServiceRegistry credentials', functi
     assert.strictEqual(response.body, '{"token":"service-token"}');
 });
 
-test('CoveoCommerceHttpService uses service credentials in apiKey mode', function () {
+test('CoveoCommerceHttpService uses service credentials and structured facet query parameters', function () {
     var capturedServiceId = '';
     var capturedUrl = '';
     var capturedHeaders = {};
@@ -386,7 +522,7 @@ test('CoveoCommerceHttpService uses service credentials in apiKey mode', functio
                 createService: function (serviceId, callbacks) {
                     var client = {
                         statusCode: 200,
-                        text: '{"responseId":"response-1"}',
+                        text: '{"values":[],"moreValuesAvailable":false}',
                         getAllResponseHeaders: function () {
                             return {
                                 'Content-Type': 'application/json'
@@ -455,11 +591,9 @@ test('CoveoCommerceHttpService uses service credentials in apiKey mode', functio
                 path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/services/CoveoServiceSupport.js'),
                 {}
             ),
-            '*/cartridge/scripts/helpers/UrlHelper': {
-                buildEndpoint: function (baseUrl, endpointPath) {
-                    return baseUrl.replace(/\/+$/, '') + '/' + endpointPath;
-                }
-            },
+            '*/cartridge/scripts/helpers/UrlHelper': require(
+                path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/helpers/UrlHelper.js')
+            ),
             '*/cartridge/scripts/helpers/Logger': {
                 info: function () {},
                 warn: function () {},
@@ -468,33 +602,39 @@ test('CoveoCommerceHttpService uses service credentials in apiKey mode', functio
         }
     );
     var response = CommerceHttpService.request({
-        name: 'search',
-        endpointPath: 'search',
+        name: 'facetSearch',
+        endpointPath: 'facet',
+        queryParams: {
+            type: 'SEARCH'
+        },
         settings: {
             organizationId: 'org-1',
             authMode: 'apiKey',
             retryCount: 0
         },
         body: {
-            query: 'chien'
+            query: '',
+            facetId: 'ec_brand'
         }
     });
 
     assert.strictEqual(capturedServiceId, 'coveo.http.commerce.api');
-    assert.strictEqual(capturedUrl, 'https://platform.cloud.coveo.com/rest/organizations/org-1/commerce/v2/search');
+    assert.strictEqual(capturedUrl, 'https://platform.cloud.coveo.com/rest/organizations/org-1/commerce/v2/facet?type=SEARCH');
     assert.strictEqual(capturedHeaders.Authorization, 'Bearer credential-api-token');
     assert.strictEqual(capturedHeaders.Accept, 'application/json');
     assert.strictEqual(capturedHeaders['Content-Type'], 'application/json');
     assert.strictEqual(capturedPayload, JSON.stringify({
-        query: 'chien'
+        query: '',
+        facetId: 'ec_brand'
     }));
     assert.strictEqual(response.statusCode, 200);
     assert.strictEqual(response.ok, true);
-    assert.strictEqual(response.data.responseId, 'response-1');
+    assert.strictEqual(response.data.moreValuesAvailable, false);
 });
 
 test('CoveoCommerceHttpService uses SearchTokenService in searchToken mode', function () {
     var capturedAuthorization = '';
+    var capturedUrl = '';
     var CommerceHttpService = loadModule(
         path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/services/CoveoCommerceHttpService.js'),
         {
@@ -511,7 +651,9 @@ test('CoveoCommerceHttpService uses SearchTokenService in searchToken mode', fun
                     return {
                         setAuthentication: function () {},
                         setRequestMethod: function () {},
-                        setURL: function () {},
+                        setURL: function (value) {
+                            capturedUrl = value;
+                        },
                         setEncoding: function () {},
                         addHeader: function (name, value) {
                             if (name === 'Authorization') {
@@ -569,11 +711,9 @@ test('CoveoCommerceHttpService uses SearchTokenService in searchToken mode', fun
                 path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/services/CoveoServiceSupport.js'),
                 {}
             ),
-            '*/cartridge/scripts/helpers/UrlHelper': {
-                buildEndpoint: function (baseUrl, endpointPath) {
-                    return baseUrl.replace(/\/+$/, '') + '/' + endpointPath;
-                }
-            },
+            '*/cartridge/scripts/helpers/UrlHelper': require(
+                path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/helpers/UrlHelper.js')
+            ),
             '*/cartridge/scripts/helpers/Logger': {
                 info: function () {},
                 warn: function () {},
@@ -583,8 +723,11 @@ test('CoveoCommerceHttpService uses SearchTokenService in searchToken mode', fun
     );
 
     CommerceHttpService.request({
-        name: 'search',
-        endpointPath: 'search',
+        name: 'facetSearch',
+        endpointPath: 'facet',
+        queryParams: {
+            type: 'SEARCH'
+        },
         settings: {
             organizationId: 'org-1',
             authMode: 'searchToken',
@@ -598,11 +741,13 @@ test('CoveoCommerceHttpService uses SearchTokenService in searchToken mode', fun
             }
         },
         body: {
-            query: 'chien'
+            query: '',
+            facetId: 'ec_brand'
         }
     });
 
     assert.strictEqual(capturedAuthorization, 'Bearer search-token-1');
+    assert.strictEqual(capturedUrl, 'https://platform.cloud.coveo.com/rest/organizations/org-1/commerce/v2/facet?type=SEARCH');
 });
 
 test('GtmHelper builds search payload with response metadata', function () {
@@ -891,6 +1036,23 @@ test('CommerceApiService.querySuggest normalizes query suggestions', function ()
                         query: params.query
                     };
                 },
+                buildFacetSearchPayload: function (params) {
+                    return {
+                        trackingId: 'mondou',
+                        clientId: 'client-1',
+                        language: 'en',
+                        country: 'CA',
+                        currency: 'CAD',
+                        query: params.query || '',
+                        facetId: params.facetId,
+                        numberOfValues: 5,
+                        context: {
+                            view: {
+                                url: 'https://example.com/mondou/search'
+                            }
+                        }
+                    };
+                },
                 buildRecommendationsPayload: function () {
                     return {};
                 },
@@ -907,13 +1069,59 @@ test('CommerceApiService.querySuggest normalizes query suggestions', function ()
             },
             '*/cartridge/scripts/services/CoveoCommerceHttpService': {
                 request: function (options) {
+                    if (options.name === 'facetSearch') {
+                        assert.strictEqual(options.endpointPath, 'facet');
+                        assert.strictEqual(options.queryParams.type, 'SEARCH');
+                        assert.strictEqual(options.body.query, '');
+                        assert.strictEqual(options.body.facetId, 'ec_brand');
+                        return {
+                            data: {
+                                values: [{
+                                    displayValue: 'Hero Dog Treats',
+                                    rawValue: 'Hero Dog Treats',
+                                    path: [],
+                                    count: 49
+                                }, {
+                                    displayValue: 'Kong',
+                                    rawValue: 'Kong',
+                                    path: [],
+                                    count: 104
+                                }, {
+                                    displayValue: 'CaniSource',
+                                    rawValue: 'CaniSource',
+                                    path: [],
+                                    count: 65
+                                }, {
+                                    displayValue: 'Envirowise',
+                                    rawValue: 'Envirowise',
+                                    path: [],
+                                    count: 2
+                                }, {
+                                    displayValue: 'BeOneBreed',
+                                    rawValue: 'BeOneBreed',
+                                    path: [],
+                                    count: 109
+                                }],
+                                moreValuesAvailable: true
+                            }
+                        };
+                    }
+
                     assert.strictEqual(options.name, 'querySuggest');
                     assert.strictEqual(options.endpointPath, 'search/querySuggest');
                     return {
                         data: {
-                            suggestions: ['chien', 'chiot'],
-                            responseId: 'response-2',
-                            queryUid: 'query-2'
+                            completions: [{
+                                expression: 'dog',
+                                highlighted: '[dog]'
+                            }],
+                            fieldSuggestionsFacets: [{
+                                facetId: 'ec_brand',
+                                field: 'ec_brand',
+                                displayName: 'Brand',
+                                type: 'regular'
+                            }],
+                            responseId: 'response-2'
                         }
                     };
                 }
@@ -955,12 +1163,171 @@ test('CommerceApiService.querySuggest normalizes query suggestions', function ()
         }
     );
     var result = CommerceApiService.querySuggest({
-        query: 'chi'
+        query: ''
     });
 
-    assert.strictEqual(result.suggestions.length, 2);
+    assert.strictEqual(result.suggestions.length, 1);
+    assert.strictEqual(result.suggestions[0].value, 'dog');
+    assert.strictEqual(result.fieldSuggestionsFacets.length, 1);
+    assert.strictEqual(result.fieldSuggestionsFacets[0].facetId, 'ec_brand');
     assert.strictEqual(result.responseId, 'response-2');
-    assert.strictEqual(result.queryUid, 'query-2');
+    assert.strictEqual(result.queryUid, '');
+
+    result = CommerceApiService.facetSearch({
+        query: '',
+        facetId: 'ec_brand'
+    });
+
+    assert.strictEqual(result.facetId, 'ec_brand');
+    assert.strictEqual(result.values.length, 5);
+    assert.strictEqual(result.values[0].displayValue, 'Hero Dog Treats');
+    assert.strictEqual(result.values[4].displayValue, 'BeOneBreed');
+    assert.strictEqual(result.moreValuesAvailable, true);
+
+    assert.throws(function () {
+        CommerceApiService.facetSearch({
+            query: '',
+            facetId: {
+                invalid: true
+            }
+        });
+    }, /facetId/);
+});
+
+test('Search controller exposes field suggestion facets and standalone facet values', function () {
+    var routes = {};
+    var jsonResponse;
+    var statusCode = 200;
+    var facetCallCount = 0;
+    var controller = loadModule(
+        path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/controllers/Search.js'),
+        {
+            globals: {
+                request: {
+                    httpURL: {
+                        toString: function () {
+                            return 'https://example.com/Search-Facet';
+                        }
+                    }
+                },
+                response: {}
+            },
+            server: {
+                get: function (name, handler) {
+                    routes[name] = handler;
+                },
+                exports: function () {
+                    return routes;
+                }
+            },
+            '*/cartridge/scripts/services/CommerceApiService': {
+                querySuggest: function () {
+                    return {
+                        suggestions: [{
+                            value: 'dog'
+                        }],
+                        fieldSuggestionsFacets: [{
+                            facetId: 'ec_brand',
+                            field: 'ec_brand',
+                            displayName: 'Brand',
+                            type: 'regular'
+                        }],
+                        responseId: 'response-1',
+                        queryUid: '',
+                        analytics: {}
+                    };
+                },
+                facetSearch: function (params) {
+                    facetCallCount += 1;
+                    assert.strictEqual(typeof params.userId, 'undefined');
+
+                    if (params.facetId === 'throws') {
+                        throw new Error('Bearer secret must not be exposed.');
+                    }
+
+                    assert.strictEqual(params.facetId, 'ec_brand');
+                    return {
+                        facetId: 'ec_brand',
+                        values: [{
+                            displayValue: 'Kong',
+                            rawValue: 'Kong',
+                            path: [],
+                            count: 104
+                        }],
+                        moreValuesAvailable: true,
+                        analytics: {}
+                    };
+                }
+            },
+            '*/cartridge/models/SearchResult': function () {},
+            '*/cartridge/scripts/helpers/GtmHelper': {
+                buildQuerySuggestResponseEvent: function () {
+                    return {};
+                }
+            },
+            '*/cartridge/scripts/helpers/Logger': {
+                error: function () {}
+            }
+        }
+    );
+    var res = {
+        json: function (value) {
+            jsonResponse = value;
+        },
+        setStatusCode: function (value) {
+            statusCode = value;
+        }
+    };
+    var next = function () {};
+    var suggestRoute = controller.Suggest;
+    var facetRoute = controller.Facet;
+
+    suggestRoute({
+        querystring: {
+            q: ''
+        }
+    }, res, next);
+    assert.strictEqual(jsonResponse.fieldSuggestionsFacets[0].facetId, 'ec_brand');
+
+    facetRoute({
+        querystring: {
+            q: '',
+            facetId: 'ec_brand',
+            numberOfValues: '5',
+            userId: 'attacker@example.com',
+            endpointPath: 'untrusted'
+        }
+    }, res, next);
+    assert.strictEqual(statusCode, 200);
+    assert.strictEqual(jsonResponse.facetId, 'ec_brand');
+    assert.strictEqual(jsonResponse.values[0].displayValue, 'Kong');
+    assert.strictEqual(jsonResponse.moreValuesAvailable, true);
+    assert.strictEqual(facetCallCount, 1);
+
+    statusCode = 200;
+    facetRoute({
+        querystring: {
+            q: '',
+            facetId: 'ec_brand',
+            numberOfValues: '5junk'
+        }
+    }, res, next);
+    assert.strictEqual(statusCode, 400);
+    assert.strictEqual(jsonResponse.error, true);
+    assert.strictEqual(facetCallCount, 1);
+
+    statusCode = 200;
+    facetRoute({
+        querystring: {
+            q: '',
+            facetId: 'throws',
+            numberOfValues: '5'
+        }
+    }, res, next);
+    assert.strictEqual(statusCode, 502);
+    assert.strictEqual(jsonResponse.message, 'Unable to retrieve Coveo facet values.');
+    assert.strictEqual(jsonResponse.message.indexOf('Bearer secret'), -1);
+    assert.strictEqual(facetCallCount, 2);
 });
 
 (function run() {

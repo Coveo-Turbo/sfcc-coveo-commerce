@@ -10,6 +10,8 @@ var SearchResultMapper = require('*/cartridge/scripts/mappers/SearchResultMapper
 var ListingResultMapper = require('*/cartridge/scripts/mappers/ListingResultMapper');
 var RecommendationMapper = require('*/cartridge/scripts/mappers/RecommendationMapper');
 var ProductSuggestionMapper = require('*/cartridge/scripts/mappers/ProductSuggestionMapper');
+var QuerySuggestionMapper = require('*/cartridge/scripts/mappers/QuerySuggestionMapper');
+var FacetSearchMapper = require('*/cartridge/scripts/mappers/FacetSearchMapper');
 var AnalyticsService = require('*/cartridge/scripts/services/AnalyticsService');
 var CoveoCommerceHttpService = require('*/cartridge/scripts/services/CoveoCommerceHttpService');
 
@@ -17,6 +19,7 @@ var ENDPOINTS = {
     SEARCH: 'search',
     LISTING: 'listing',
     QUERY_SUGGEST: 'search/querySuggest',
+    FACET_SEARCH: 'facet',
     PRODUCT_SUGGEST: 'search/productSuggest',
     RECOMMENDATIONS: 'recommendations'
 };
@@ -53,6 +56,22 @@ function validatePayload(operationName, payload) {
     }
 }
 
+function validateFacetSearchPayload(payload) {
+    validatePayload('facetSearch', payload);
+
+    if (typeof payload.query !== 'string') {
+        throw new Error('Missing required Coveo Commerce facet-search query.');
+    }
+
+    if (typeof payload.facetId !== 'string' || !payload.facetId) {
+        throw new Error('Missing required Coveo Commerce facet-search facetId.');
+    }
+
+    if (!payload.context || !payload.context.view || !payload.context.view.url) {
+        throw new Error('Missing required Coveo Commerce facet-search context.view.url.');
+    }
+}
+
 function buildAnalyticsContext(params) {
     var requestParams = params || {};
 
@@ -66,10 +85,11 @@ function buildAnalyticsContext(params) {
     );
 }
 
-function execute(operationName, endpointPath, payload, authContext, settings) {
+function execute(operationName, endpointPath, payload, authContext, settings, queryParams) {
     return CoveoCommerceHttpService.request({
         name: operationName,
         endpointPath: endpointPath,
+        queryParams: queryParams,
         authContext: authContext,
         body: payload,
         settings: settings,
@@ -230,47 +250,6 @@ function buildDebugSnapshot(operationName, endpointPath, payload, response, mapp
     };
 }
 
-function normalizeSuggestions(response, analyticsContext) {
-    var source = response || {};
-    var suggestions = source.completions || source.suggestions || source.items || [];
-
-    function normalizeSuggestionValue(item) {
-        var value = item.expression || item.highlighted || item.value || item.query || item.label || '';
-
-        return String(value)
-            .replace(/\[/g, '')
-            .replace(/\]/g, '')
-            .replace(/[{}()]/g, '')
-            .replace(/^\s+|\s+$/g, '');
-    }
-
-    return {
-        suggestions: suggestions.map(function (item) {
-            if (typeof item === 'string') {
-                return {
-                    value: item
-                };
-            }
-
-            return {
-                value: normalizeSuggestionValue(item),
-                raw: item
-            };
-        }).filter(function (item) {
-            return !!item.value;
-        }),
-        responseId: source.responseId || '',
-        queryUid: source.queryUid || '',
-        analytics: {
-            clientId: analyticsContext.clientId || '',
-            responseId: source.responseId || '',
-            queryUid: source.queryUid || '',
-            searchHub: analyticsContext.searchHub || '',
-            pipeline: analyticsContext.pipeline || ''
-        }
-    };
-}
-
 function search(params) {
     var requestParams = params || {};
     var settings = Config.getSettings();
@@ -336,7 +315,32 @@ function querySuggest(params) {
     validatePayload('querySuggest', payload);
     response = execute('querySuggest', ENDPOINTS.QUERY_SUGGEST, payload, requestParams, settings);
 
-    return normalizeSuggestions(response.data, analyticsContext);
+    return QuerySuggestionMapper.map(response.data, analyticsContext);
+}
+
+function facetSearch(params) {
+    var requestParams = params || {};
+    var settings = Config.getSettings();
+    var analyticsContext;
+    var payload;
+    var response;
+
+    validateConfiguration(settings);
+    analyticsContext = buildAnalyticsContext(requestParams);
+    payload = QueryBuilder.buildFacetSearchPayload(requestParams, settings, analyticsContext);
+    validateFacetSearchPayload(payload);
+    response = execute(
+        'facetSearch',
+        ENDPOINTS.FACET_SEARCH,
+        payload,
+        requestParams,
+        settings,
+        {
+            type: 'SEARCH'
+        }
+    );
+
+    return FacetSearchMapper.map(response.data, requestParams, analyticsContext);
 }
 
 function productSuggest(params) {
@@ -380,6 +384,7 @@ module.exports = {
     search: search,
     listing: listing,
     querySuggest: querySuggest,
+    facetSearch: facetSearch,
     productSuggest: productSuggest,
     recommendations: recommendations
 };
