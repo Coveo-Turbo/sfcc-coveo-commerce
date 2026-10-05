@@ -101,10 +101,26 @@ function ensureClientId(httpRequest, httpResponse) {
 
 function buildRequestContext(httpRequest, httpResponse, overrides) {
     var config = Config.getSettings();
-    var context = overrides || {};
+    var context = overrides && typeof overrides === 'object' ? overrides : {};
+    var clientId;
+
+    if (!config.analyticsEnabled) {
+        return {
+            clientId: null,
+            searchHub: context.searchHub || config.searchHub,
+            pipeline: context.pipeline || config.pipeline
+        };
+    }
+
+    clientId = context.clientId || ensureClientId(httpRequest, httpResponse);
+
+    // Reuse the supplied object as request-scoped state. This prevents a
+    // second identity lookup from replacing a cookie generated earlier in
+    // the same server request before that cookie is visible to the browser.
+    context.clientId = clientId;
 
     return {
-        clientId: ensureClientId(httpRequest, httpResponse),
+        clientId: clientId,
         searchHub: context.searchHub || config.searchHub,
         pipeline: context.pipeline || config.pipeline
     };

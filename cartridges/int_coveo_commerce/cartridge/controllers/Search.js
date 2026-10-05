@@ -3,6 +3,7 @@
 
 var server = require('server');
 var CommerceApiService = require('*/cartridge/scripts/services/CommerceApiService');
+var AnalyticsService = require('*/cartridge/scripts/services/AnalyticsService');
 var SearchResult = require('*/cartridge/models/SearchResult');
 var GtmHelper = require('*/cartridge/scripts/helpers/GtmHelper');
 var Logger = require('*/cartridge/scripts/helpers/Logger');
@@ -139,6 +140,16 @@ server.get('Show', function (req, res, next) {
     } catch (error) {
         renderPageError(res, error);
     }
+
+    return next();
+});
+
+server.get('InitializeAnalytics', function (req, res, next) {
+    var analytics = AnalyticsService.buildRequestContext(request, response);
+
+    res.json({
+        analytics: analytics
+    });
 
     return next();
 });

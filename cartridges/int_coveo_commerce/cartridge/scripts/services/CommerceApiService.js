@@ -74,14 +74,27 @@ function validateFacetSearchPayload(payload) {
 
 function buildAnalyticsContext(params) {
     var requestParams = params || {};
+    var analyticsContext = requestParams.analyticsContext;
+
+    // analyticsContext is an internal server-side state carrier. Do not use
+    // query-string clientId values: the first-party visitor cookie remains
+    // the authority for shopper identity.
+    if (!analyticsContext || typeof analyticsContext !== 'object') {
+        analyticsContext = {};
+    }
+
+    if (!analyticsContext.searchHub) {
+        analyticsContext.searchHub = requestParams.searchHub;
+    }
+
+    if (!analyticsContext.pipeline) {
+        analyticsContext.pipeline = requestParams.pipeline;
+    }
 
     return AnalyticsService.buildRequestContext(
         requestParams.request || null,
         requestParams.response || null,
-        {
-            searchHub: requestParams.searchHub,
-            pipeline: requestParams.pipeline
-        }
+        analyticsContext
     );
 }
 
