@@ -7,6 +7,78 @@ var Logger = require('*/cartridge/scripts/helpers/Logger');
 
 var COOKIE_NAME = 'coveo_visitorId';
 var COOKIE_MAX_AGE_SECONDS = 63072000;
+var SESSION_KEY = 'coveoVisitorId';
+
+// SFCC evaluates script modules per request, so this memo is request-scoped.
+// It is additionally keyed by request ID to stay correct if a module instance
+// is ever reused across requests.
+var requestMemo = {
+    requestId: null,
+    clientId: null
+};
+
+function getRequestId(httpRequest) {
+    if (!httpRequest) {
+        return '';
+    }
+
+    if (httpRequest.requestID) {
+        return String(httpRequest.requestID);
+    }
+
+    if (httpRequest.getRequestID) {
+        return String(httpRequest.getRequestID());
+    }
+
+    return '';
+}
+
+function readMemoClientId(httpRequest) {
+    if (!requestMemo.clientId) {
+        return null;
+    }
+
+    if (requestMemo.requestId !== getRequestId(httpRequest)) {
+        return null;
+    }
+
+    return requestMemo.clientId;
+}
+
+function writeMemoClientId(httpRequest, clientId) {
+    requestMemo = {
+        requestId: getRequestId(httpRequest),
+        clientId: clientId
+    };
+}
+
+function getSessionPrivacy(httpRequest) {
+    var currentSession = httpRequest && httpRequest.session ? httpRequest.session : null;
+
+    if (currentSession && currentSession.privacy) {
+        return currentSession.privacy;
+    }
+
+    return null;
+}
+
+function readSessionClientId(httpRequest) {
+    var privacy = getSessionPrivacy(httpRequest);
+
+    if (privacy && privacy[SESSION_KEY]) {
+        return String(privacy[SESSION_KEY]);
+    }
+
+    return null;
+}
+
+function writeSessionClientId(httpRequest, clientId) {
+    var privacy = getSessionPrivacy(httpRequest);
+
+    if (privacy) {
+        privacy[SESSION_KEY] = clientId;
+    }
+}
 
 function getCookies(httpRequest) {
     if (!httpRequest || !httpRequest.getHttpCookies) {
@@ -87,11 +159,27 @@ function ensureClientId(httpRequest, httpResponse) {
     clientId = getClientId(httpRequest);
 
     if (clientId) {
+        writeMemoClientId(httpRequest, clientId);
+        writeSessionClientId(httpRequest, clientId);
+
         return clientId;
     }
 
-    clientId = UUIDUtils.createUUID();
+    // A cookie added to the response is not readable from the current request.
+    // Reuse the ID already created during this request so a second call cannot
+    // replace the visitor cookie with a different value.
+    clientId = readMemoClientId(httpRequest);
+
+    if (clientId) {
+        return clientId;
+    }
+
+    // Concurrent first-visit requests share the storefront session, so a
+    // session-held ID keeps them on one identity.
+    clientId = readSessionClientId(httpRequest) || UUIDUtils.createUUID();
     persistClientId(httpRequest, httpResponse, clientId);
+    writeMemoClientId(httpRequest, clientId);
+    writeSessionClientId(httpRequest, clientId);
     Logger.debug('Generated Coveo analytics client ID.', {
         cookieName: COOKIE_NAME
     });

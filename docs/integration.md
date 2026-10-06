@@ -74,10 +74,25 @@ from each attempting to establish a different visitor identity. The cartridge
 does not ship storefront JavaScript; customers own consent handling and this
 request sequencing.
 
+`AnalyticsService` resolves the client ID in this order:
+
+1. the `coveo_visitorId` request cookie
+2. an ID already generated earlier in the same request
+3. an ID held in `session.privacy`
+4. a newly generated UUID
+
+Steps 2 and 3 exist because a cookie added to the response is not readable from
+the current request. They guarantee that repeated `ensureClientId()` or
+`buildRequestContext()` calls within one request return the same value and emit
+at most one visitor cookie, and that concurrent first-visit requests sharing a
+storefront session stay on one identity. Integrations that call
+`AnalyticsService.ensureClientId()` directly get this behavior without changes.
+
+Because the session can restore an ID, clearing only the `coveo_visitorId`
+cookie mid-session re-applies the same ID until the storefront session ends.
+
 When server-side code invokes multiple `CommerceApiService` operations within
-one request, create and pass one `analyticsContext` object to each call. The
-service memoizes a newly generated client ID on that object, so later calls
-reuse it before the response cookie is available to the current request.
+one request, it can also pass one shared `analyticsContext` object to each call.
 
 ```javascript
 var analyticsContext = {};
@@ -98,6 +113,10 @@ var productSuggestions = CommerceApiService.productSuggest({
 Do not accept `clientId` from query parameters. The client ID is resolved from
 the first-party cookie or a server-owned `analyticsContext`; only response IDs
 and query UIDs vary per API response.
+
+Response normalization must not discard this resolved context. When a mapper or
+helper computes fallback analytics, it should do so only when the source
+response has no client ID, rather than eagerly on every response.
 
 ## Companion Repository
 
