@@ -89,6 +89,250 @@ function loadModule(filePath, stubs, cache) {
     return module.exports;
 }
 
+test('AnalyticsService memoizes a generated client ID on request-scoped context', function () {
+    var generatedIds = 0;
+    var cookies = [];
+    var AnalyticsService = loadModule(
+        path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/services/AnalyticsService.js'),
+        {
+            'dw/web/Cookie': function (name, value) {
+                this.name = name;
+                this.value = value;
+                this.setMaxAge = function () {};
+                this.setPath = function () {};
+                this.setHttpOnly = function () {};
+                this.setSecure = function () {};
+            },
+            'dw/util/UUIDUtils': {
+                createUUID: function () {
+                    generatedIds += 1;
+                    return 'generated-client-' + generatedIds;
+                }
+            },
+            '*/cartridge/scripts/config/Config': {
+                getSettings: function () {
+                    return {
+                        analyticsEnabled: true,
+                        searchHub: 'storefront',
+                        pipeline: 'commerce-search'
+                    };
+                }
+            },
+            '*/cartridge/scripts/helpers/Logger': {
+                debug: function () {}
+            }
+        }
+    );
+    var request = {
+        getHttpCookies: function () {
+            return null;
+        },
+        isHttpSecure: function () {
+            return true;
+        }
+    };
+    var response = {
+        addHttpCookie: function (cookie) {
+            cookies.push(cookie);
+        }
+    };
+    var analyticsContext = {};
+    var first = AnalyticsService.buildRequestContext(request, response, analyticsContext);
+    var second = AnalyticsService.buildRequestContext(request, response, analyticsContext);
+
+    assert.strictEqual(first.clientId, 'generated-client-1');
+    assert.strictEqual(second.clientId, first.clientId);
+    assert.strictEqual(analyticsContext.clientId, first.clientId);
+    assert.strictEqual(generatedIds, 1);
+    assert.strictEqual(cookies.length, 1);
+    assert.strictEqual(cookies[0].value, first.clientId);
+});
+
+test('AnalyticsService preserves a supplied client ID without emitting a visitor cookie', function () {
+    var generatedIds = 0;
+    var cookies = [];
+    var AnalyticsService = loadModule(
+        path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/services/AnalyticsService.js'),
+        {
+            'dw/web/Cookie': function () {},
+            'dw/util/UUIDUtils': {
+                createUUID: function () {
+                    generatedIds += 1;
+                    return 'unexpected-client-id';
+                }
+            },
+            '*/cartridge/scripts/config/Config': {
+                getSettings: function () {
+                    return {
+                        analyticsEnabled: true,
+                        searchHub: 'storefront',
+                        pipeline: 'commerce-search'
+                    };
+                }
+            },
+            '*/cartridge/scripts/helpers/Logger': {
+                debug: function () {}
+            }
+        }
+    );
+    var analytics = AnalyticsService.buildRequestContext({
+        getHttpCookies: function () {
+            return null;
+        }
+    }, {
+        addHttpCookie: function (cookie) {
+            cookies.push(cookie);
+        }
+    }, {
+        clientId: 'existing-client-id'
+    });
+
+    assert.strictEqual(analytics.clientId, 'existing-client-id');
+    assert.strictEqual(generatedIds, 0);
+    assert.strictEqual(cookies.length, 0);
+});
+
+function loadAnalyticsServiceWithCounters(state) {
+    return loadModule(
+        path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/services/AnalyticsService.js'),
+        {
+            'dw/web/Cookie': function (name, value) {
+                this.name = name;
+                this.value = value;
+                this.setMaxAge = function () {};
+                this.setPath = function () {};
+                this.setHttpOnly = function () {};
+                this.setSecure = function () {};
+            },
+            'dw/util/UUIDUtils': {
+                createUUID: function () {
+                    state.generated += 1;
+                    return 'generated-client-' + state.generated;
+                }
+            },
+            '*/cartridge/scripts/config/Config': {
+                getSettings: function () {
+                    return {
+                        analyticsEnabled: true,
+                        searchHub: 'storefront',
+                        pipeline: 'commerce-search'
+                    };
+                }
+            },
+            '*/cartridge/scripts/helpers/Logger': {
+                debug: function () {}
+            }
+        }
+    );
+}
+
+test('AnalyticsService reuses one client ID across repeated ensureClientId calls', function () {
+    var state = {
+        generated: 0
+    };
+    var cookies = [];
+    var AnalyticsService = loadAnalyticsServiceWithCounters(state);
+    var session = {
+        privacy: {}
+    };
+    var httpRequest = {
+        requestID: 'request-1',
+        session: session,
+        getHttpCookies: function () {
+            return null;
+        }
+    };
+    var httpResponse = {
+        addHttpCookie: function (cookie) {
+            cookies.push(cookie);
+        }
+    };
+    var first = AnalyticsService.ensureClientId(httpRequest, httpResponse);
+    var second = AnalyticsService.ensureClientId(httpRequest, httpResponse);
+    var viaContext = AnalyticsService.buildRequestContext(httpRequest, httpResponse, {});
+
+    assert.strictEqual(first, 'generated-client-1');
+    assert.strictEqual(second, first);
+    assert.strictEqual(viaContext.clientId, first);
+    assert.strictEqual(state.generated, 1);
+    assert.strictEqual(cookies.length, 1);
+    assert.strictEqual(session.privacy.coveoVisitorId, first);
+});
+
+test('AnalyticsService reuses the session client ID for a concurrent cookieless request', function () {
+    var state = {
+        generated: 0
+    };
+    var cookies = [];
+    var AnalyticsService = loadAnalyticsServiceWithCounters(state);
+    var session = {
+        privacy: {}
+    };
+    var httpResponse = {
+        addHttpCookie: function (cookie) {
+            cookies.push(cookie);
+        }
+    };
+    var buildRequest = function (requestId) {
+        return {
+            requestID: requestId,
+            session: session,
+            getHttpCookies: function () {
+                return null;
+            }
+        };
+    };
+    var first = AnalyticsService.ensureClientId(buildRequest('request-1'), httpResponse);
+    var concurrent = AnalyticsService.ensureClientId(buildRequest('request-2'), httpResponse);
+
+    assert.strictEqual(concurrent, first);
+    assert.strictEqual(state.generated, 1);
+    assert.strictEqual(cookies.length, 2);
+    assert.strictEqual(cookies[0].value, cookies[1].value);
+});
+
+test('AnalyticsService prefers the request cookie over memoized and session state', function () {
+    var state = {
+        generated: 0
+    };
+    var cookies = [];
+    var AnalyticsService = loadAnalyticsServiceWithCounters(state);
+    var session = {
+        privacy: {
+            coveoVisitorId: 'stale-session-id'
+        }
+    };
+    var httpRequest = {
+        requestID: 'request-1',
+        session: session,
+        getHttpCookies: function () {
+            return {
+                getCookie: function (name) {
+                    if (name !== 'coveo_visitorId') {
+                        return null;
+                    }
+
+                    return {
+                        getValue: function () {
+                            return 'cookie-client-id';
+                        }
+                    };
+                }
+            };
+        }
+    };
+    var resolved = AnalyticsService.ensureClientId(httpRequest, {
+        addHttpCookie: function (cookie) {
+            cookies.push(cookie);
+        }
+    });
+
+    assert.strictEqual(resolved, 'cookie-client-id');
+    assert.strictEqual(state.generated, 0);
+    assert.strictEqual(cookies.length, 0);
+    assert.strictEqual(session.privacy.coveoVisitorId, 'cookie-client-id');
+});
+
 test('QueryBuilder builds productSuggest payload from request context', function () {
     var QueryBuilder = require(path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/scripts/helpers/QueryBuilder.js'));
     var payload = QueryBuilder.buildProductSuggestPayload({
@@ -1205,7 +1449,7 @@ test('CommerceApiService.querySuggest normalizes query suggestions', function ()
     }, /facetId/);
 });
 
-test('Search controller exposes field suggestion facets and standalone facet values', function () {
+test('Search controller initializes analytics and exposes suggestion facets', function () {
     var routes = {};
     var jsonResponse;
     var statusCode = 200;
@@ -1273,6 +1517,15 @@ test('Search controller exposes field suggestion facets and standalone facet val
                     };
                 }
             },
+            '*/cartridge/scripts/services/AnalyticsService': {
+                buildRequestContext: function () {
+                    return {
+                        clientId: 'initialized-client-id',
+                        searchHub: 'storefront',
+                        pipeline: 'commerce-search'
+                    };
+                }
+            },
             '*/cartridge/models/SearchResult': function () {},
             '*/cartridge/scripts/helpers/GtmHelper': {
                 buildQuerySuggestResponseEvent: function () {
@@ -1293,8 +1546,12 @@ test('Search controller exposes field suggestion facets and standalone facet val
         }
     };
     var next = function () {};
+    var initializeAnalyticsRoute = controller.InitializeAnalytics;
     var suggestRoute = controller.Suggest;
     var facetRoute = controller.Facet;
+
+    initializeAnalyticsRoute({}, res, next);
+    assert.strictEqual(jsonResponse.analytics.clientId, 'initialized-client-id');
 
     suggestRoute({
         querystring: {

@@ -97,6 +97,207 @@ skip_request() {
     printf 'SKIP %-28s %s\n' "$name" "$reason"
 }
 
+# Reads analytics.clientId from a saved JSON response body.
+read_response_client_id() {
+    python3 - "$1" <<'PY' 2>/dev/null
+import json
+import sys
+
+try:
+    with open(sys.argv[1]) as handle:
+        payload = json.load(handle)
+except Exception:
+    sys.exit(0)
+
+analytics = payload.get('analytics') or {}
+sys.stdout.write(str(analytics.get('clientId') or ''))
+PY
+}
+
+# Reads the coveo_visitorId value from Set-Cookie response headers.
+read_header_cookie() {
+    grep -i 'set-cookie:[[:space:]]*coveo_visitorId=' "$1" 2>/dev/null |
+        tail -1 |
+        sed -E 's/.*coveo_visitorId=([^;[:space:]]*).*/\1/'
+}
+
+count_header_cookie() {
+    count=$(grep -c -i 'set-cookie:[[:space:]]*coveo_visitorId=' "$1" 2>/dev/null)
+
+    if [ -z "${count:-}" ]; then
+        count=0
+    fi
+
+    printf '%s' "$count"
+}
+
+# Reads the coveo_visitorId value retained in a cookie jar.
+read_jar_cookie() {
+    grep -i 'coveo_visitorId' "$1" 2>/dev/null | tail -1 | awk '{print $NF}'
+}
+
+# Issues a request against an isolated cookie jar so first-visit identity
+# behavior can be observed independently of the main matrix session.
+isolated_request() {
+    name="$1"
+    jar="$2"
+    route="$3"
+    shift 3
+
+    curl \
+        --silent \
+        --show-error \
+        --location \
+        --max-time "$TIMEOUT" \
+        --cookie "$jar" \
+        --cookie-jar "$jar" \
+        --dump-header "${OUTPUT_DIR}/${name}.headers" \
+        --output "${OUTPUT_DIR}/${name}.json" \
+        --write-out '%{http_code}' \
+        --get "${BASE_URL}/${route}" \
+        "$@"
+}
+
+# Sends the retained cookie without writing the jar. Concurrent requests must
+# not share a jar for writing, because simultaneous writes corrupt it.
+isolated_request_readonly() {
+    name="$1"
+    jar="$2"
+    route="$3"
+    shift 3
+
+    curl \
+        --silent \
+        --show-error \
+        --location \
+        --max-time "$TIMEOUT" \
+        --cookie "$jar" \
+        --dump-header "${OUTPUT_DIR}/${name}.headers" \
+        --output "${OUTPUT_DIR}/${name}.json" \
+        --write-out '%{http_code}' \
+        --get "${BASE_URL}/${route}" \
+        "$@"
+}
+
+report_check() {
+    name="$1"
+    outcome="$2"
+    detail="$3"
+
+    TOTAL=$((TOTAL + 1))
+
+    if [ "$outcome" = 'pass' ]; then
+        PASSED=$((PASSED + 1))
+        printf 'PASS %-28s %s\n' "$name" "$detail"
+    else
+        FAILED=$((FAILED + 1))
+        printf 'FAIL %-28s %s\n' "$name" "$detail"
+    fi
+}
+
+# Compares identifiers without printing full visitor values.
+fingerprint() {
+    value="$1"
+
+    if [ -z "$value" ]; then
+        printf '%s' '<empty>'
+        return
+    fi
+
+    printf '%s' "$(printf '%s' "$value" | cut -c1-8)..."
+}
+
+run_client_id_continuity_checks() {
+    if ! command -v python3 >/dev/null 2>&1; then
+        skip_request 'client-id-continuity' 'python3 is required to parse analytics.clientId'
+        return
+    fi
+
+    preview_jar="${OUTPUT_DIR}/continuity-preview-cookies.txt"
+    init_jar="${OUTPUT_DIR}/continuity-init-cookies.txt"
+    : > "$preview_jar"
+    : > "$init_jar"
+
+    # Defect 1: a first-visit product suggestion must report the same client ID
+    # that it stores in the visitor cookie.
+    preview_status=$(isolated_request 'continuity-first-preview' "$preview_jar" 'Search-ProductSuggestions' \
+        --data-urlencode "q=${QUERY}")
+    preview_client_id=$(read_response_client_id "${OUTPUT_DIR}/continuity-first-preview.json")
+    preview_cookie=$(read_header_cookie "${OUTPUT_DIR}/continuity-first-preview.headers")
+    preview_cookie_count=$(count_header_cookie "${OUTPUT_DIR}/continuity-first-preview.headers")
+
+    if [ "$preview_status" != '200' ]; then
+        report_check 'first-preview-identity' 'fail' "expected HTTP 200, received ${preview_status}"
+    elif [ -z "$preview_client_id" ]; then
+        skip_request 'first-preview-identity' 'no analytics.clientId returned; analytics may be disabled'
+    elif [ "$preview_client_id" = "$preview_cookie" ]; then
+        report_check 'first-preview-identity' 'pass' "response clientId matches visitor cookie ($(fingerprint "$preview_client_id"))"
+    else
+        report_check 'first-preview-identity' 'fail' \
+            "response clientId $(fingerprint "$preview_client_id") does not match cookie $(fingerprint "$preview_cookie")"
+    fi
+
+    if [ "${preview_cookie_count:-0}" -gt 1 ]; then
+        report_check 'first-preview-single-cookie' 'fail' "received ${preview_cookie_count} coveo_visitorId headers"
+    else
+        report_check 'first-preview-single-cookie' 'pass' "received ${preview_cookie_count:-0} coveo_visitorId header(s)"
+    fi
+
+    # Initialization route must establish the cookie it reports.
+    init_status=$(isolated_request 'continuity-initialize' "$init_jar" 'Search-InitializeAnalytics')
+    init_client_id=$(read_response_client_id "${OUTPUT_DIR}/continuity-initialize.json")
+    init_cookie=$(read_jar_cookie "$init_jar")
+
+    if [ "$init_status" != '200' ]; then
+        report_check 'initialize-analytics' 'fail' "expected HTTP 200, received ${init_status}"
+        return
+    fi
+
+    if [ -z "$init_client_id" ]; then
+        skip_request 'initialize-analytics' 'no analytics.clientId returned; analytics may be disabled'
+        return
+    fi
+
+    if [ "$init_client_id" = "$init_cookie" ]; then
+        report_check 'initialize-analytics' 'pass' "established visitor cookie ($(fingerprint "$init_client_id"))"
+    else
+        report_check 'initialize-analytics' 'fail' \
+            "response clientId $(fingerprint "$init_client_id") does not match cookie $(fingerprint "$init_cookie")"
+    fi
+
+    # Defect 2: once identity exists, concurrent suggestions must reuse it and
+    # must not establish a competing visitor cookie.
+    isolated_request_readonly 'continuity-concurrent-suggest' "$init_jar" 'Search-Suggest' \
+        --data-urlencode "q=${QUERY}" \
+        --data-urlencode "count=${NUMBER_OF_VALUES}" >/dev/null &
+    suggest_pid=$!
+    isolated_request_readonly 'continuity-concurrent-preview' "$init_jar" 'Search-ProductSuggestions' \
+        --data-urlencode "q=${QUERY}" >/dev/null &
+    preview_pid=$!
+    wait "$suggest_pid"
+    wait "$preview_pid"
+
+    concurrent_suggest_id=$(read_response_client_id "${OUTPUT_DIR}/continuity-concurrent-suggest.json")
+    concurrent_preview_id=$(read_response_client_id "${OUTPUT_DIR}/continuity-concurrent-preview.json")
+
+    if [ "$concurrent_suggest_id" = "$init_client_id" ] && [ "$concurrent_preview_id" = "$init_client_id" ]; then
+        report_check 'concurrent-suggest-identity' 'pass' "both responses reused $(fingerprint "$init_client_id")"
+    else
+        report_check 'concurrent-suggest-identity' 'fail' \
+            "suggest $(fingerprint "$concurrent_suggest_id") and preview $(fingerprint "$concurrent_preview_id") expected $(fingerprint "$init_client_id")"
+    fi
+
+    suggest_cookie_count=$(count_header_cookie "${OUTPUT_DIR}/continuity-concurrent-suggest.headers")
+    preview_cookie_count_after_init=$(count_header_cookie "${OUTPUT_DIR}/continuity-concurrent-preview.headers")
+    reissued=$((suggest_cookie_count + preview_cookie_count_after_init))
+
+    if [ "$reissued" -eq 0 ]; then
+        report_check 'concurrent-no-cookie-reissue' 'pass' 'no visitor cookie was replaced'
+    else
+        report_check 'concurrent-no-cookie-reissue' 'fail' "${reissued} coveo_visitorId header(s) reissued"
+    fi
+}
+
 printf 'Coveo Commerce validation\n'
 printf 'Base URL: %s\n' "$BASE_URL"
 printf 'Output:   %s\n\n' "$OUTPUT_DIR"
@@ -149,6 +350,9 @@ if [ -n "$CATEGORY_ID" ]; then
 else
     skip_request 'category-listing' 'set COVEO_CATEGORY_ID to enable'
 fi
+
+printf '\nClient ID continuity\n'
+run_client_id_continuity_checks
 
 printf '\nResults: %s passed, %s failed, %s skipped, %s requests\n' "$PASSED" "$FAILED" "$SKIPPED" "$TOTAL"
 printf 'Response bodies and headers: %s\n' "$OUTPUT_DIR"

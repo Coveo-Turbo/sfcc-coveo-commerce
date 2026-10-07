@@ -68,6 +68,29 @@ The script requests these routes and checks their expected HTTP statuses:
 - Recommendations when a slot ID is supplied
 - Category listing when a category ID is supplied
 
+## Client ID Continuity
+
+After the route matrix, the script runs first-visit identity checks on isolated
+cookie jars:
+
+| Check | Assertion |
+| --- | --- |
+| `first-preview-identity` | A fresh-cookie `Search-ProductSuggestions` response reports the same `analytics.clientId` it stores in `coveo_visitorId` |
+| `first-preview-single-cookie` | That response sets at most one `coveo_visitorId` header |
+| `initialize-analytics` | `Search-InitializeAnalytics` establishes the visitor cookie it reports |
+| `concurrent-suggest-identity` | Query suggest and product suggest issued concurrently after initialization both reuse the established client ID |
+| `concurrent-no-cookie-reissue` | Neither concurrent response replaces the visitor cookie |
+
+These checks require `python3` to read `analytics.clientId` and are skipped when
+it is unavailable. They are also skipped when analytics is disabled and no client
+ID is returned. Identifiers are printed as truncated fingerprints so full visitor
+values stay out of validation logs.
+
+The concurrency check passes only because identity is established first. Two
+genuinely cookie-less concurrent requests still mint separate IDs; the storefront
+is responsible for completing one consent-compliant initialization request before
+it starts typed suggestion traffic.
+
 The matrix is a route/status smoke test; HTTP 200 alone does not prove the normalized Commerce contract. Set `COVEO_PRINT_BODIES=true` to print responses, or inspect the files retained in `COVEO_OUTPUT_DIR`. Confirm that:
 
 - Empty-query suggestions include the expected popular searches and normalized `fieldSuggestionsFacets`.

@@ -21,6 +21,7 @@ The storefront keeps ownership of templates, styling, JavaScript behavior, and c
 The cartridge includes thin sample controllers:
 
 - `Search-Show`
+- `Search-InitializeAnalytics`
 - `Search-Suggest`
 - `Search-Facet`
 - `Search-ProductSuggestions`
@@ -57,6 +58,65 @@ In this cartridge, the minted search token is used by the server-side integratio
 - Connect field suggestions returned by `Search-Suggest` to `Search-Facet`
 - Connect recommendation slots to `Search-Recommendations`
 - Push analytics events through GTM or another tracking layer
+
+## Visitor Identity Initialization
+
+`coveo_visitorId` is the first-party cookie authority for the Coveo Commerce
+`clientId`. Before a storefront dispatches first-visit query and product
+suggestion requests, it must complete one consent-compliant request to
+`Search-InitializeAnalytics`. The route establishes the cookie and returns
+the same value in `analytics.clientId`.
+
+Storefront code should retain one initialization promise and queue suggestion
+requests until it resolves. Do not cancel the initialization request when the
+shopper starts typing. This prevents concurrent first-visit suggestion calls
+from each attempting to establish a different visitor identity. The cartridge
+does not ship storefront JavaScript; customers own consent handling and this
+request sequencing.
+
+`AnalyticsService` resolves the client ID in this order:
+
+1. the `coveo_visitorId` request cookie
+2. an ID already generated earlier in the same request
+3. an ID held in `session.privacy`
+4. a newly generated UUID
+
+Steps 2 and 3 exist because a cookie added to the response is not readable from
+the current request. They guarantee that repeated `ensureClientId()` or
+`buildRequestContext()` calls within one request return the same value and emit
+at most one visitor cookie, and that concurrent first-visit requests sharing a
+storefront session stay on one identity. Integrations that call
+`AnalyticsService.ensureClientId()` directly get this behavior without changes.
+
+Because the session can restore an ID, clearing only the `coveo_visitorId`
+cookie mid-session re-applies the same ID until the storefront session ends.
+
+When server-side code invokes multiple `CommerceApiService` operations within
+one request, it can also pass one shared `analyticsContext` object to each call.
+
+```javascript
+var analyticsContext = {};
+var querySuggestions = CommerceApiService.querySuggest({
+    request: request,
+    response: response,
+    analyticsContext: analyticsContext,
+    query: 'dog'
+});
+var productSuggestions = CommerceApiService.productSuggest({
+    request: request,
+    response: response,
+    analyticsContext: analyticsContext,
+    query: 'dog'
+});
+```
+
+Do not accept `clientId` from query parameters. The client ID is resolved from
+the first-party cookie or a server-owned `analyticsContext`; only response IDs
+and query UIDs vary per API response.
+
+Response normalization must not discard this resolved context. When a mapper or
+helper computes fallback analytics, it should do so only when the source
+response has no client ID, rather than eagerly on every response.
 
 ## Companion Repository
 
