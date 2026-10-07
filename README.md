@@ -99,7 +99,7 @@ npm install
 npm test
 cp dw.example.json dw.json
 npm run uploadCartridge
-npm run uploadDemoCartridge # Optional: deploys sample routes
+npm run uploadDemoCartridge # Required for the default demo-route validation below
 npm run packageMetadata
 ```
 
@@ -109,6 +109,8 @@ After activating the uploaded code version, importing the metadata, and configur
 export COVEO_BASE_URL="https://<sandbox-host>/on/demandware.store/Sites-<site-id>-Site/fr_CA"
 npm run validateServices
 ```
+
+The matrix defaults to the demo `Search-*` and `Category-Show` routes. To validate a customer storefront without deploying `app_coveo_commerce_demo`, configure the equivalent `COVEO_ROUTE_*` mappings described in the [Validation Guide](docs/validation.md).
 
 `dw.json` is intentionally ignored and should stay local to your machine.
 
