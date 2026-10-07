@@ -1,13 +1,13 @@
 # Customization Guide
 
-Scripts and mappers can be overridden from a custom storefront cartridge placed earlier in the cartridge path. Controllers require additional care: SFCC selects the first controller with a given filename and does not merge same-named controllers automatically.
+Scripts and mappers can be overridden from a custom storefront cartridge placed earlier in the cartridge path. `int_coveo_commerce` contains no controllers, so its installation cannot shadow customer routes.
 
-For an existing storefront, prefer calling `CommerceApiService` from the storefront's controllers. If a customer `Search.js` or `Category.js` appears before this cartridge, it must explicitly expose or chain any sample routes it wants to retain. Conversely, placing `int_coveo_commerce` first can hide downstream storefront routes because its sample controllers are standalone.
+For an existing storefront, call `CommerceApiService` from the storefront's controllers. The optional `app_coveo_commerce_demo` cartridge has standalone `Search.js` and `Category.js`; use it only for reference. SFCC selects the first same-named controller on the cartridge path and does not merge controllers automatically.
 
 ## Common Override Points
 
-- `controllers/Search.js`
-- `controllers/Category.js`
+- Customer-owned `controllers/Search.js` or search-box controller
+- Customer-owned `controllers/Category.js`
 - `scripts/services/CommerceApiService.js`
 - `scripts/services/CoveoCommerceHttpService.js`
 - `scripts/services/CoveoSearchTokenHttpService.js`
@@ -23,8 +23,8 @@ For an existing storefront, prefer calling `CommerceApiService` from the storefr
 - Add storefront-specific request parameters before calling `CommerceApiService`
 - Extend normalized product payloads with custom fields
 - Change how facets or sorting are presented in view data
-- Replace the sample `Search-ProductSuggestions` route or call `CommerceApiService.productSuggest()` directly from a storefront-specific search-box controller
-- Use `Search-Suggest` to read CMH-provided `fieldSuggestionsFacets`, then call `Search-Facet` or `CommerceApiService.facetSearch()` for the descriptors the storefront displays
+- Use the demo `Search-ProductSuggestions` route only as a reference, then call `CommerceApiService.productSuggest()` from a storefront-specific search-box controller
+- Use a customer query-suggest endpoint to read CMH-provided `fieldSuggestionsFacets`, then call a customer facet endpoint or `CommerceApiService.facetSearch()` for the descriptors the storefront displays
 - Pass `searchTokenOptions` when you need to control user groups, filters, or allowed dictionary keys in search-token mode
 - Push GTM payloads through a custom client-side analytics integration
 
