@@ -70,5 +70,5 @@ Service notes:
   - `currency` defaults from the current SFRA session currency
   - site preferences act as fallbacks for non-storefront contexts, jobs, or custom service calls
 - `trackingId`, language, country, locale, currency, search hub, and pipeline can still be overridden per request by passing values into `CommerceApiService`.
-- All Commerce request payloads can include additional context fields from the storefront layer. The sample `Search-Facet` route accepts a bounded JSON-object `context`; direct service calls can pass an object through `CommerceApiService`.
+- All Commerce request payloads can include additional context fields from the storefront layer. The optional demo `Search-Facet` route accepts a bounded JSON-object `context`; customer-owned routes and direct service calls can pass an object through `CommerceApiService`.
 - If you need a specific user identity, groups, or filter in a search token, pass `searchTokenOptions` into `CommerceApiService` from an overriding controller or service layer.

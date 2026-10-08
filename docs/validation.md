@@ -1,14 +1,15 @@
 # Validation Guide
 
-Use the reusable curl matrix to smoke-test controller routes and expected HTTP statuses against an SFCC sandbox after uploading and activating the code version.
+Use the reusable curl matrix to smoke-test explicitly mapped controller routes and expected HTTP statuses against an SFCC sandbox after uploading and activating the code version.
 
 ## Prerequisites
 
 - The cartridge is deployed and configured as described in the installation and configuration guides.
-- The sample `Search` and `Category` controllers resolve on the effective cartridge path, or the storefront exposes equivalent routes with the same names.
+- For the default demo workflow, `app_coveo_commerce_demo:int_coveo_commerce` resolves on the effective cartridge path.
+- For a customer storefront workflow, equivalent routes are configured with the `COVEO_ROUTE_*` variables below.
 - `curl` is installed.
 
-SFCC selects the first controller with a given filename from the cartridge path. It does not automatically merge the sample `Search.js` or `Category.js` with customer controllers. A `ControllerException` stating that an action was not found means another controller took precedence; expose the route from the storefront controller or adjust the path temporarily in a sandbox.
+The defaults target the optional demo routes. SFCC selects the first controller with a given filename from the cartridge path and does not merge controllers. Do not add the demo cartridge to a production customer path merely to run this matrix; map the customer-owned equivalent routes instead.
 
 ## Required Setup
 
@@ -16,6 +17,7 @@ Set the SFCC controller base URL. The site ID and locale are case-sensitive:
 
 ```bash
 export COVEO_BASE_URL="https://<sandbox-host>/on/demandware.store/Sites-<site-id>-Site/fr_CA"
+export COVEO_ROUTE_TARGET="demo"
 ```
 
 Run the matrix:
@@ -38,6 +40,23 @@ export COVEO_PRINT_BODIES="true"
 ```
 
 `COVEO_NUMBER_OF_VALUES` is used as query-suggest `count` and facet-search `numberOfValues`.
+
+### Customer Route Mapping
+
+The defaults below target the demo routes. For a customer storefront, set a descriptive target label and provide its route mappings before running the matrix:
+
+```bash
+export COVEO_ROUTE_TARGET="customer storefront"
+export COVEO_ROUTE_SEARCH_SHOW="CoveoSearch-Show"
+export COVEO_ROUTE_INITIALIZE_ANALYTICS="CoveoSearch-InitializeAnalytics"
+export COVEO_ROUTE_SUGGEST="CoveoSearch-Suggest"
+export COVEO_ROUTE_FACET="CoveoSearch-Facet"
+export COVEO_ROUTE_PRODUCT_SUGGESTIONS="CoveoSearch-ProductSuggestions"
+export COVEO_ROUTE_RECOMMENDATIONS="CoveoSearch-Recommendations"
+export COVEO_ROUTE_CATEGORY_SHOW="CoveoCategory-Show"
+```
+
+Each mapped endpoint must preserve the response contracts expected by the matrix, including `analytics.clientId` for the initialization, query-suggest, and product-suggestion identity checks.
 
 Override where artifacts and cookies are stored:
 
@@ -75,9 +94,9 @@ cookie jars:
 
 | Check | Assertion |
 | --- | --- |
-| `first-preview-identity` | A fresh-cookie `Search-ProductSuggestions` response reports the same `analytics.clientId` it stores in `coveo_visitorId` |
+| `first-preview-identity` | A fresh-cookie product-suggestion route response reports the same `analytics.clientId` it stores in `coveo_visitorId` |
 | `first-preview-single-cookie` | That response sets at most one `coveo_visitorId` header |
-| `initialize-analytics` | `Search-InitializeAnalytics` establishes the visitor cookie it reports |
+| `initialize-analytics` | The configured initialization route establishes the visitor cookie it reports |
 | `concurrent-suggest-identity` | Query suggest and product suggest issued concurrently after initialization both reuse the established client ID |
 | `concurrent-no-cookie-reissue` | Neither concurrent response replaces the visitor cookie |
 

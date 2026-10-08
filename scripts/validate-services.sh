@@ -24,6 +24,14 @@ COOKIE_JAR="${COVEO_COOKIE_JAR:-${OUTPUT_DIR}/cookies.txt}"
 PRINT_BODIES="${COVEO_PRINT_BODIES:-false}"
 RECOMMENDATION_SLOT_ID="${COVEO_RECOMMENDATION_SLOT_ID:-}"
 CATEGORY_ID="${COVEO_CATEGORY_ID:-}"
+ROUTE_TARGET="${COVEO_ROUTE_TARGET:-demo}"
+ROUTE_SEARCH_SHOW="${COVEO_ROUTE_SEARCH_SHOW:-Search-Show}"
+ROUTE_INITIALIZE_ANALYTICS="${COVEO_ROUTE_INITIALIZE_ANALYTICS:-Search-InitializeAnalytics}"
+ROUTE_SUGGEST="${COVEO_ROUTE_SUGGEST:-Search-Suggest}"
+ROUTE_FACET="${COVEO_ROUTE_FACET:-Search-Facet}"
+ROUTE_PRODUCT_SUGGESTIONS="${COVEO_ROUTE_PRODUCT_SUGGESTIONS:-Search-ProductSuggestions}"
+ROUTE_RECOMMENDATIONS="${COVEO_ROUTE_RECOMMENDATIONS:-Search-Recommendations}"
+ROUTE_CATEGORY_SHOW="${COVEO_ROUTE_CATEGORY_SHOW:-Category-Show}"
 
 TOTAL=0
 PASSED=0
@@ -220,7 +228,7 @@ run_client_id_continuity_checks() {
 
     # Defect 1: a first-visit product suggestion must report the same client ID
     # that it stores in the visitor cookie.
-    preview_status=$(isolated_request 'continuity-first-preview' "$preview_jar" 'Search-ProductSuggestions' \
+    preview_status=$(isolated_request 'continuity-first-preview' "$preview_jar" "$ROUTE_PRODUCT_SUGGESTIONS" \
         --data-urlencode "q=${QUERY}")
     preview_client_id=$(read_response_client_id "${OUTPUT_DIR}/continuity-first-preview.json")
     preview_cookie=$(read_header_cookie "${OUTPUT_DIR}/continuity-first-preview.headers")
@@ -244,7 +252,7 @@ run_client_id_continuity_checks() {
     fi
 
     # Initialization route must establish the cookie it reports.
-    init_status=$(isolated_request 'continuity-initialize' "$init_jar" 'Search-InitializeAnalytics')
+    init_status=$(isolated_request 'continuity-initialize' "$init_jar" "$ROUTE_INITIALIZE_ANALYTICS")
     init_client_id=$(read_response_client_id "${OUTPUT_DIR}/continuity-initialize.json")
     init_cookie=$(read_jar_cookie "$init_jar")
 
@@ -267,11 +275,11 @@ run_client_id_continuity_checks() {
 
     # Defect 2: once identity exists, concurrent suggestions must reuse it and
     # must not establish a competing visitor cookie.
-    isolated_request_readonly 'continuity-concurrent-suggest' "$init_jar" 'Search-Suggest' \
+    isolated_request_readonly 'continuity-concurrent-suggest' "$init_jar" "$ROUTE_SUGGEST" \
         --data-urlencode "q=${QUERY}" \
         --data-urlencode "count=${NUMBER_OF_VALUES}" >/dev/null &
     suggest_pid=$!
-    isolated_request_readonly 'continuity-concurrent-preview' "$init_jar" 'Search-ProductSuggestions' \
+    isolated_request_readonly 'continuity-concurrent-preview' "$init_jar" "$ROUTE_PRODUCT_SUGGESTIONS" \
         --data-urlencode "q=${QUERY}" >/dev/null &
     preview_pid=$!
     wait "$suggest_pid"
@@ -300,52 +308,53 @@ run_client_id_continuity_checks() {
 
 printf 'Coveo Commerce validation\n'
 printf 'Base URL: %s\n' "$BASE_URL"
+printf 'Route target: %s\n' "$ROUTE_TARGET"
 printf 'Output:   %s\n\n' "$OUTPUT_DIR"
 
-run_request 'query-suggest-empty' 200 'Search-Suggest' \
+run_request 'query-suggest-empty' 200 "$ROUTE_SUGGEST" \
     --data-urlencode 'q=' \
     --data-urlencode "count=${NUMBER_OF_VALUES}"
 
-run_request 'query-suggest-typed' 200 'Search-Suggest' \
+run_request 'query-suggest-typed' 200 "$ROUTE_SUGGEST" \
     --data-urlencode "q=${QUERY}" \
     --data-urlencode "count=${NUMBER_OF_VALUES}"
 
-run_request 'facet-search-empty' 200 'Search-Facet' \
+run_request 'facet-search-empty' 200 "$ROUTE_FACET" \
     --data-urlencode 'q=' \
     --data-urlencode "facetId=${FACET_ID}" \
     --data-urlencode "numberOfValues=${NUMBER_OF_VALUES}"
 
-run_request 'facet-search-custom-context' 200 'Search-Facet' \
+run_request 'facet-search-custom-context' 200 "$ROUTE_FACET" \
     --data-urlencode 'q=' \
     --data-urlencode "facetId=${FACET_ID}" \
     --data-urlencode "numberOfValues=${NUMBER_OF_VALUES}" \
     --data-urlencode "context=${FACET_CONTEXT}"
 
-run_request 'facet-search-typed' 200 'Search-Facet' \
+run_request 'facet-search-typed' 200 "$ROUTE_FACET" \
     --data-urlencode "q=${QUERY}" \
     --data-urlencode "facetId=${FACET_ID}" \
     --data-urlencode "numberOfValues=${NUMBER_OF_VALUES}"
 
-run_request 'product-suggestions' 200 'Search-ProductSuggestions' \
+run_request 'product-suggestions' 200 "$ROUTE_PRODUCT_SUGGESTIONS" \
     --data-urlencode "q=${QUERY}"
 
-run_request 'facet-invalid-count' 400 'Search-Facet' \
+run_request 'facet-invalid-count' 400 "$ROUTE_FACET" \
     --data-urlencode 'q=' \
     --data-urlencode "facetId=${FACET_ID}" \
     --data-urlencode 'numberOfValues=5junk'
 
-run_request 'search-page' 200 'Search-Show' \
+run_request 'search-page' 200 "$ROUTE_SEARCH_SHOW" \
     --data-urlencode "q=${QUERY}"
 
 if [ -n "$RECOMMENDATION_SLOT_ID" ]; then
-    run_request 'recommendations' 200 'Search-Recommendations' \
+    run_request 'recommendations' 200 "$ROUTE_RECOMMENDATIONS" \
         --data-urlencode "slotId=${RECOMMENDATION_SLOT_ID}"
 else
     skip_request 'recommendations' 'set COVEO_RECOMMENDATION_SLOT_ID to enable'
 fi
 
 if [ -n "$CATEGORY_ID" ]; then
-    run_request 'category-listing' 200 'Category-Show' \
+    run_request 'category-listing' 200 "$ROUTE_CATEGORY_SHOW" \
         --data-urlencode "cgid=${CATEGORY_ID}"
 else
     skip_request 'category-listing' 'set COVEO_CATEGORY_ID to enable'

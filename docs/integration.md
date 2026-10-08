@@ -16,9 +16,9 @@ SFRA Controller -> CommerceApiService -> Coveo Commerce API
 
 The storefront keeps ownership of templates, styling, JavaScript behavior, and customer-specific merchandising logic.
 
-## Sample Controllers
+## Optional Demo Controllers
 
-The cartridge includes thin sample controllers:
+`int_coveo_commerce` contains no controllers. The separately deployed `app_coveo_commerce_demo` cartridge contains these thin reference routes:
 
 - `Search-Show`
 - `Search-InitializeAnalytics`
@@ -34,9 +34,9 @@ These controllers:
 - call `CommerceApiService`
 - expose normalized data and analytics metadata through `res.setViewData()` or JSON responses
 
-They do not ship templates. The sample page routes render existing SFRA search templates to demonstrate the integration seam, while customers remain free to override the controllers or use the service layer directly.
+They do not ship templates. The demo page routes render existing SFRA search templates to demonstrate the integration seam. The demo must appear before `int_coveo_commerce` on the cartridge path, for example `app_coveo_commerce_demo:int_coveo_commerce:app_storefront_base`.
 
-SFCC selects controllers from left to right on the cartridge path and does not merge same-named controllers automatically. If `int_coveo_commerce` is first, its standalone `Search.js` and `Category.js` can hide downstream storefront routes. If a customer cartridge is first, its controllers can hide these sample routes. Existing storefronts should generally keep their controllers in control and call `CommerceApiService` directly or explicitly expose the desired sample actions.
+SFCC selects controllers from left to right on the cartridge path and does not merge same-named controllers automatically. The demo's `Search.js` and `Category.js` can hide downstream storefront routes, so existing storefronts should keep their controllers in control and call `CommerceApiService` directly. A customer controller can expose equivalent routes where that is useful, but no demo cartridge is required to use any supported service operation.
 
 ## Authentication Modes
 
@@ -52,20 +52,22 @@ In this cartridge, the minted search token is used by the server-side integratio
 
 - Install the cartridge
 - Configure site preferences
-- Override or extend the sample `Search` and `Category` controllers as needed
+- Call `CommerceApiService` from customer-owned `Search`, `Category`, or search-box controllers
 - Wire existing templates to the normalized `coveoSearch` or `coveoListing` data contracts
-- Connect autocomplete UI to `Search-Suggest`
-- Connect field suggestions returned by `Search-Suggest` to `Search-Facet`
-- Connect recommendation slots to `Search-Recommendations`
+- Connect autocomplete UI to a customer route that calls `CommerceApiService.querySuggest()`
+- Connect field suggestions to a customer route that calls `CommerceApiService.facetSearch()`
+- Connect recommendation slots to a customer route that calls `CommerceApiService.recommendations()`
 - Push analytics events through GTM or another tracking layer
 
 ## Visitor Identity Initialization
 
 `coveo_visitorId` is the first-party cookie authority for the Coveo Commerce
 `clientId`. Before a storefront dispatches first-visit query and product
-suggestion requests, it must complete one consent-compliant request to
-`Search-InitializeAnalytics`. The route establishes the cookie and returns
-the same value in `analytics.clientId`.
+suggestion requests, it must complete one consent-compliant initialization
+request. A customer route can call `AnalyticsService.buildRequestContext(request,
+response)` and return the result; the demo exposes this behavior as
+`Search-InitializeAnalytics`. The call establishes the cookie and returns the
+same value in `analytics.clientId`.
 
 Storefront code should retain one initialization promise and queue suggestion
 requests until it resolves. Do not cancel the initialization request when the
@@ -124,7 +126,7 @@ Use `sfcc-coveo-catalog-ingestion` alongside this repository when you need catal
 
 ## Popular Searches and Field Suggestions
 
-`Search-Suggest` accepts an empty query. Coveo can return popular query completions in that state:
+The demo `Search-Suggest` route accepts an empty query; a customer equivalent that calls `CommerceApiService.querySuggest()` has the same capability. Coveo can return popular query completions in that state:
 
 ```text
 Search-Suggest?q=&count=5
@@ -143,7 +145,7 @@ Example descriptor:
 }
 ```
 
-For each descriptor the storefront chooses to display, call the standalone facet route with its `facetId` (or `field` when `facetId` is absent):
+For each descriptor the storefront chooses to display, call a customer-owned endpoint that invokes `CommerceApiService.facetSearch()` with its `facetId` (or `field` when `facetId` is absent). The demo route is `Search-Facet`:
 
 ```text
 Search-Facet?q=&facetId=ec_brand&numberOfValues=5
@@ -166,9 +168,9 @@ curl --get "$BASE/Search-Facet" \
   --data-urlencode 'context={"custom":{"applyBestSellerSort":true}}'
 ```
 
-The sample route accepts `context` only as a valid JSON object up to 8192 characters. It uses the HTTP `Referer` as `context.view.url` unless the supplied context already contains a view URL; without either, the request URL is used. `QueryBuilder` also supplies defaults for `capture` and `cart` and adds available user-agent/referrer metadata. Unrelated top-level query parameters are not forwarded into Commerce request context or search-token options.
+The demo route accepts `context` only as a valid JSON object up to 8192 characters. It uses the HTTP `Referer` as `context.view.url` unless the supplied context already contains a view URL; without either, the request URL is used. Customer routes should apply equivalent input validation. `QueryBuilder` also supplies defaults for `capture` and `cart` and adds available user-agent/referrer metadata. Unrelated top-level query parameters are not forwarded into Commerce request context or search-token options.
 
-This delegates to `CommerceApiService.facetSearch()` and sends `POST /rest/organizations/{organizationId}/commerce/v2/facet?type=SEARCH` with a payload containing `trackingId`, `clientId`, `query`, `facetId`, `numberOfValues`, `language`, `country`, `currency`, and `context`. The sample route returns:
+This delegates to `CommerceApiService.facetSearch()` and sends `POST /rest/organizations/{organizationId}/commerce/v2/facet?type=SEARCH` with a payload containing `trackingId`, `clientId`, `query`, `facetId`, `numberOfValues`, `language`, `country`, `currency`, and `context`. The demo route returns:
 
 ```json
 {
@@ -190,7 +192,7 @@ This delegates to `CommerceApiService.facetSearch()` and sends `POST /rest/organ
 }
 ```
 
-The sample route applies these constraints:
+The demo route applies these constraints:
 
 | Parameter | Constraint |
 | --- | --- |
@@ -199,7 +201,7 @@ The sample route applies these constraints:
 | `numberOfValues` or `count` | Optional strict integer from 1 through 100; default `5` |
 | `context` | Optional JSON object; maximum 8192 characters |
 
-Direct `CommerceApiService.facetSearch()` calls receive the mapper's additional `raw` response property and normalize `numberOfValues` to the 1–100 range. The sample route deliberately omits `raw`. Neither flow automatically calls the facet endpoint from `querySuggest`; the storefront owns which descriptors to resolve and can issue independent requests for them.
+Direct `CommerceApiService.facetSearch()` calls receive the mapper's additional `raw` response property and normalize `numberOfValues` to the 1–100 range. The demo route deliberately omits `raw`. Neither flow automatically calls the facet endpoint from `querySuggest`; the storefront owns which descriptors to resolve and can issue independent requests for them.
 
 Server-side integrations can call the two primitives directly:
 

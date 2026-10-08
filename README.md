@@ -2,7 +2,9 @@
 
 `sfcc-coveo-commerce` provides the reusable `int_coveo_commerce` Salesforce Commerce Cloud cartridge for integrating an existing SFRA storefront with the Coveo Commerce API.
 
-The cartridge is intentionally integration-focused. It owns Commerce API access, authentication, normalized response mapping, analytics context, configuration, and thin sample controllers. It does not ship storefront UI, templates, CSS, JavaScript widgets, or customer-specific business logic.
+The reusable `int_coveo_commerce` cartridge is intentionally integration-focused. It owns Commerce API access, authentication, normalized response mapping, analytics context, configuration, models, mappers, and helpers. It does not ship storefront controllers, UI, templates, CSS, JavaScript widgets, or customer-specific business logic.
+
+`app_coveo_commerce_demo` is a separate, optional reference cartridge. It contains thin sample routes only and depends on `int_coveo_commerce` being later on the cartridge path. It is not a customer storefront implementation.
 
 ## Ecosystem
 
@@ -25,9 +27,6 @@ SFCC + Coveo
 cartridges/
   int_coveo_commerce/
     cartridge/
-      controllers/
-        Search.js
-        Category.js
       models/
         SearchResult.js
         ListingResult.js
@@ -58,6 +57,11 @@ cartridges/
           CoveoSearchTokenHttpService.js
           CoveoServiceSupport.js
           SearchTokenService.js
+  app_coveo_commerce_demo/
+    cartridge/
+      controllers/
+        Search.js
+        Category.js
 ```
 
 ## Responsibilities
@@ -95,6 +99,7 @@ npm install
 npm test
 cp dw.example.json dw.json
 npm run uploadCartridge
+npm run uploadDemoCartridge # Required for the default demo-route validation below
 npm run packageMetadata
 ```
 
@@ -104,6 +109,8 @@ After activating the uploaded code version, importing the metadata, and configur
 export COVEO_BASE_URL="https://<sandbox-host>/on/demandware.store/Sites-<site-id>-Site/fr_CA"
 npm run validateServices
 ```
+
+The matrix defaults to the demo `Search-*` and `Category-Show` routes. To validate a customer storefront without deploying `app_coveo_commerce_demo`, configure the equivalent `COVEO_ROUTE_*` mappings described in the [Validation Guide](docs/validation.md).
 
 `dw.json` is intentionally ignored and should stay local to your machine.
 
@@ -116,12 +123,24 @@ The cartridge now uses concrete SFCC `LocalServiceRegistry` services for outboun
 
 ## Cartridge Path and Controllers
 
-The cartridge must be present on the site cartridge path. Ordering depends on how the storefront integrates its controllers. For an intentionally standalone demonstration against SFRA base, the order can be:
+The integration cartridge must be present on the site cartridge path. It has no controllers, so it cannot replace or hide SFRA or customer controllers. Production integrations should keep the storefront in control and call `CommerceApiService` from their existing controllers:
 
 ```text
-int_coveo_commerce:app_storefront_base
+app_custom_storefront:int_coveo_commerce:app_storefront_base
 ```
 
-SFCC resolves controllers from left to right and does not merge controllers with the same filename automatically. With the order above, the sample `Search.js` and `Category.js` replace downstream controllers and can hide SFRA routes they do not declare. Do not use this ordering unchanged in an existing storefront without reviewing those controllers.
+For an intentionally standalone reference installation, deploy the optional demo cartridge and use:
 
-The recommended customer integration is to keep the storefront cartridge in control, call `CommerceApiService` from its existing controllers, and expose only the routes it needs. Placing a custom cartridge before `int_coveo_commerce` also allows mapper or service overrides, but does not automatically make the sample `Search-*` or `Category-*` routes available; the custom controller must explicitly expose or chain them.
+```text
+app_coveo_commerce_demo:int_coveo_commerce:app_storefront_base
+```
+
+The demo provides `Search-*` and `Category-Show` reference routes, including `Search-InitializeAnalytics`. SFCC resolves controllers from left to right and does not merge same-named controllers. Keep this demo-only path out of production storefronts because its `Search.js` and `Category.js` intentionally take precedence over downstream controllers.
+
+## Migration from Earlier Releases
+
+Earlier releases exposed sample `Search-*` and `Category-Show` routes from `int_coveo_commerce`. Those routes now reside in `app_coveo_commerce_demo`. Users relying on them must either deploy the demo cartridge before `int_coveo_commerce`, or move the required calls to customer-owned controllers. New integrations should use the latter approach.
+
+## License
+
+Copyright 2026 Coveo Solutions Inc. This project is licensed under the [Apache License, Version 2.0](LICENSE).

@@ -1449,13 +1449,13 @@ test('CommerceApiService.querySuggest normalizes query suggestions', function ()
     }, /facetId/);
 });
 
-test('Search controller initializes analytics and exposes suggestion facets', function () {
+test('Demo Search controller initializes analytics and exposes suggestion facets', function () {
     var routes = {};
     var jsonResponse;
     var statusCode = 200;
     var facetCallCount = 0;
     var controller = loadModule(
-        path.join(repoRoot, 'cartridges/int_coveo_commerce/cartridge/controllers/Search.js'),
+        path.join(repoRoot, 'cartridges/app_coveo_commerce_demo/cartridge/controllers/Search.js'),
         {
             globals: {
                 request: {

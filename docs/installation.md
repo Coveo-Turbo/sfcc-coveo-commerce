@@ -8,7 +8,7 @@
 
 ## Install The Cartridge
 
-Add this repository to your SFCC project and ensure the cartridge is available under the `int_coveo_commerce` folder name.
+Add this repository to your SFCC project and ensure the reusable integration cartridge is available under the `int_coveo_commerce` folder name.
 
 The cartridge source lives in:
 
@@ -16,21 +16,29 @@ The cartridge source lives in:
 cartridges/int_coveo_commerce
 ```
 
-For an intentionally standalone demonstration against SFRA base, the cartridge path can be:
-
-```text
-int_coveo_commerce:app_storefront_base
-```
-
-This ordering makes the cartridge's standalone `Search.js` and `Category.js` the selected controllers. SFCC does not merge same-named controllers automatically, so these sample controllers can hide downstream SFRA routes they do not declare.
-
-For an existing storefront, keep the customer cartridge in control and call `CommerceApiService` from its controllers. A common order is:
+`int_coveo_commerce` has no controllers. Adding it to a cartridge path therefore cannot replace or hide an SFRA or customer controller. For an existing storefront, keep the customer cartridge in control and call `CommerceApiService` from customer-owned controllers:
 
 ```text
 app_custom_storefront:int_coveo_commerce:app_storefront_base
 ```
 
-With that order, a customer `Search.js` or `Category.js` takes precedence and must explicitly expose or chain any desired sample routes. Mapper and service overrides can also be placed in the customer cartridge.
+The optional reference routes are in a separate cartridge:
+
+```text
+cartridges/app_coveo_commerce_demo
+```
+
+For an intentionally standalone demonstration against SFRA base, deploy both cartridges and use:
+
+```text
+app_coveo_commerce_demo:int_coveo_commerce:app_storefront_base
+```
+
+The demo cartridge depends on `int_coveo_commerce` being later in the path. Its `Search.js` and `Category.js` intentionally take precedence over downstream controllers, so this path is for reference/demo use only, not an existing production storefront.
+
+### Migration from Earlier Releases
+
+Earlier releases provided `Search-*` and `Category-Show` sample routes from `int_coveo_commerce`. To preserve those routes, deploy `app_coveo_commerce_demo` before `int_coveo_commerce`. Prefer migrating production code to customer-owned controllers that call `CommerceApiService` directly.
 
 ## Deploy
 
@@ -42,6 +50,7 @@ For the npm-based upload workflow used in this repository:
 npm install
 cp dw.example.json dw.json
 npm run uploadCartridge
+npm run uploadDemoCartridge # Optional: deploys the reference routes
 npm run packageMetadata
 ```
 
@@ -99,6 +108,6 @@ Keep `dw.json` local and out of source control.
 ## Next Steps
 
 - Configure credentials and runtime settings
-- Wire the search and category routes to your storefront flow
+- Call `CommerceApiService` from customer-owned search and category controllers
 - Connect query suggestions, field-suggestion facet searches, and recommendation slots
 - Push analytics events with your GTM or storefront analytics layer
