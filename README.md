@@ -140,3 +140,7 @@ The demo provides `Search-*` and `Category-Show` reference routes, including `Se
 ## Migration from Earlier Releases
 
 Earlier releases exposed sample `Search-*` and `Category-Show` routes from `int_coveo_commerce`. Those routes now reside in `app_coveo_commerce_demo`. Users relying on them must either deploy the demo cartridge before `int_coveo_commerce`, or move the required calls to customer-owned controllers. New integrations should use the latter approach.
+
+## License
+
+Copyright 2026 Coveo Solutions Inc. This project is licensed under the [Apache License, Version 2.0](LICENSE).
